@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "1",
+  "defaultLocale": "de-DE",
+  "entities": {
+    "product": {
+      "locales": {
+        "de-DE": { "preferred": { "singular": "flooff" } }
+      }
+    },
+    "invoice": {
+      "locales": {
+        "de-DE": {
+          "preferred": { "singular": "rechnung" },
+          "alternates": ["flooff"]
+        }
+      }
+    }
+  }
+}

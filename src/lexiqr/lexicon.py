@@ -87,13 +87,15 @@ class Lexicon:
                 "entities", "is empty; a lexicon with no entities resolves nothing"
             )
 
+        parsed = {
+            canonical_id: _locales(entity, canonical_id)
+            for canonical_id, entity in entities.items()
+        }
+        _reject_ambiguous_surface_forms(parsed)
         return cls(
             schema_version=SCHEMA_VERSION,
             default_locale=default_locale,
-            entities={
-                canonical_id: _locales(entity, canonical_id)
-                for canonical_id, entity in entities.items()
-            },
+            entities=parsed,
         )
 
     @classmethod
@@ -193,12 +195,60 @@ def _surface_forms(forms: Any, canonical_id: str, locale: str) -> SurfaceForms:
             raise fault(field, f"must be a label, not {_kind(surface_form)}")
         if not surface_form:
             raise fault(field, "is empty; a surface form nobody can type is a bug")
+        # Beyond the schema, whose minLength cannot tell a label from a blank
+        # one (see docs/lexicon-semantic-checks.md).
+        if not surface_form.strip():
+            raise fault(
+                field,
+                f"is {surface_form!r}, which is only whitespace; that is not a "
+                f"label a user can type",
+            )
 
     return SurfaceForms(
         preferred_singular=preferred["singular"],
         preferred_plural=preferred.get("plural"),
         alternates=tuple(alternates),
     )
+
+
+def _reject_ambiguous_surface_forms(
+    entities: dict[str, dict[str, SurfaceForms]],
+) -> None:
+    """Refuse a lexicon in which one word could resolve to two entities.
+
+    Beyond the schema, which cannot see across entities (see
+    docs/lexicon-semantic-checks.md). Determinism is a headline guarantee, and
+    there is no defensible way to pick a winner here — so the ambiguity is
+    refused at load time rather than resolved arbitrarily in production.
+    """
+    claimed: dict[tuple[str, str], tuple[str, str]] = {}
+    for canonical_id, locales in entities.items():
+        for locale, forms in locales.items():
+            for field, surface_form in _named_forms(forms):
+                key = (locale, surface_form.casefold())
+                if key in claimed:
+                    owner, owner_field = claimed[key]
+                    raise _fault(
+                        field,
+                        f"claims the surface form {surface_form!r}, which entity "
+                        f"{owner!r} already claims as {owner_field!r} in this "
+                        f"locale; one word cannot resolve to two entities",
+                        canonical_id=canonical_id,
+                        locale=locale,
+                    )
+                claimed[key] = (canonical_id, field)
+
+
+def _named_forms(forms: SurfaceForms) -> list[tuple[str, str]]:
+    """Every surface form of one entity in one locale, paired with its field."""
+    named = [("preferred.singular", forms.preferred_singular)]
+    if forms.preferred_plural is not None:
+        named.append(("preferred.plural", forms.preferred_plural))
+    named += [
+        (f"alternates[{index}]", alternate)
+        for index, alternate in enumerate(forms.alternates)
+    ]
+    return named
 
 
 def _fault(

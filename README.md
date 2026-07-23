@@ -26,7 +26,7 @@ This is a single-repo project: it is both the meta-repo (vision and blueprint) a
 |------|-----------|------------|
 | `src/lexiqr/` (excl. `cli.py`) | **core** | The deterministic resolution engine and public typed API |
 | `src/lexiqr/cli.py` | **cli** | `lexiqr validate` / `lexiqr try` for lexicon authors |
-| `schema/` | **schema** | The versioned JSON Schema for lexicon files |
+| `schema/` | **schema** | The versioned JSON Schema for lexicon files, plus the shared fixture corpus |
 | `.github/workflows/`, `pyproject.toml` | **delivery** | CI gates and tag→PyPI trusted publishing |
 
 Cross-container truth lives at the root:
@@ -36,6 +36,8 @@ Cross-container truth lives at the root:
 - [CONTEXT.md](CONTEXT.md) — the project glossary
 - [docs/adr/](docs/adr/) — architecture decision records (repo shape, contracts)
 - [docs/plans/](docs/plans/) — dependency-ordered implementation plans
+- [docs/lexicon-semantic-checks.md](docs/lexicon-semantic-checks.md) — the complete list of
+  checks core enforces beyond the published schema, and why
 
 ## Contributing
 
