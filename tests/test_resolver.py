@@ -40,6 +40,19 @@ def test_flooff_resolves_to_the_product_entity_at_its_span_in_the_prompt() -> No
     assert "wo ist flooff"[match.span[0] : match.span[1]] == "flooff"
 
 
+def test_a_misspelled_surface_form_still_resolves_carrying_its_correction() -> None:
+    resolver = EntityResolver.from_file(FIXTURE_PATH)
+
+    report = resolver.transform("wo ist floof", "de-DE")
+
+    assert len(report.matches) == 1
+    match = report.matches[0]
+    assert match.canonical_id == "product"
+    assert match.surface_form == "flooff"
+    assert match.correction == "floof"
+    assert report.prompt[match.span[0] : match.span[1]] == "floof"
+
+
 def test_a_hit_on_a_preferred_surface_form_scores_in_the_preferred_tier() -> None:
     from lexiqr import ScoreTier
 

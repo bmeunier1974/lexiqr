@@ -46,6 +46,25 @@ class Hit:
     score_tier: ScoreTier
 
 
+@dataclass(frozen=True)
+class SurfaceForm:
+    """One declared surface form, folded once, ready to compare against.
+
+    The exact scan reaches these through the automaton; the fuzzy pass reaches
+    them through `SurfaceFormIndex.forms()`, because tolerance has to compare a
+    typed token against every candidate it might be a misspelling of, not only
+    the ones a prefix already led it to.
+    """
+
+    #: The form as the normalizer folded it — the alphabet the scan works in.
+    folded: str
+    canonical_id: str
+    #: The form as the tenant declared it, carried untouched so a match can name
+    #: what it resolved to in the tenant's own spelling.
+    surface_form: str
+    score_tier: ScoreTier
+
+
 @dataclass
 class _Node:
     children: dict[str, _Node] = field(default_factory=dict)
@@ -59,8 +78,9 @@ class _Node:
 class SurfaceFormIndex:
     """The surface forms of one lexicon in one locale, ready to scan with."""
 
-    def __init__(self, root: _Node) -> None:
+    def __init__(self, root: _Node, forms: tuple[SurfaceForm, ...]) -> None:
         self._root = root
+        self._forms = forms
 
     @classmethod
     def build(cls, lexicon: Lexicon, locale: str) -> SurfaceFormIndex:
@@ -70,12 +90,13 @@ class SurfaceFormIndex:
         by accident: a caller who states a locale gets that locale's answers.
         """
         root = _Node()
+        forms: list[SurfaceForm] = []
         for canonical_id, locales in lexicon.entities.items():
-            forms = locales.get(locale)
-            if forms is None:
+            entity_forms = locales.get(locale)
+            if entity_forms is None:
                 continue
             seen: set[str] = set()
-            for surface_form, tier in _tiered_surface_forms(canonical_id, forms):
+            for surface_form, tier in _tiered_surface_forms(canonical_id, entity_forms):
                 folded = normalize_text(surface_form, locale)
                 # An entity whose canonical ID reads the same as one of its
                 # labels ("invoice") declared one form, not two candidates at
@@ -83,8 +104,19 @@ class SurfaceFormIndex:
                 if folded and folded not in seen:
                     seen.add(folded)
                     _insert(root, folded, canonical_id, surface_form, tier)
+                    forms.append(
+                        SurfaceForm(folded, canonical_id, surface_form, tier)
+                    )
         _link_failures(root)
-        return cls(root)
+        return cls(root, tuple(forms))
+
+    def forms(self) -> tuple[SurfaceForm, ...]:
+        """Every compiled candidate form, for the fuzzy pass to compare against.
+
+        The order is the tiered declaration order `build` inserted them in; the
+        fuzzy pass imposes its own total ranking and does not lean on this.
+        """
+        return self._forms
 
     def scan(self, text: str) -> tuple[Hit, ...]:
         """Every whole-word occurrence of every compiled form, in one pass."""
