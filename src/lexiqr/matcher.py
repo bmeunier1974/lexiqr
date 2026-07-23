@@ -1,8 +1,9 @@
 """The lexicon scan: prompt + surface forms → entity matches with spans.
 
-Seed of the normalize → lexicon scan → fuzzy pass pipeline. The stages exist
-here as seams, not as features: normalization is casefolding only, and there
-is no fuzzy pass yet.
+The scan works entirely in normalized coordinates — it compares folded text to
+folded surface forms — and translates each hit back to the original prompt
+before it leaves. That translation happens once, here, at the boundary, so the
+spans a caller receives are always offsets into the prompt they passed in.
 """
 
 from __future__ import annotations
@@ -10,22 +11,24 @@ from __future__ import annotations
 import re
 
 from lexiqr.lexicon import Lexicon, SurfaceForms
+from lexiqr.normalizer import Normalized, normalize, normalize_text
 from lexiqr.types import EntityMatch, ScoreTier
 
 
 def scan(prompt: str, lexicon: Lexicon, locale: str) -> tuple[EntityMatch, ...]:
     """Find every exact occurrence of a surface form of `locale` in `prompt`."""
+    normalized = normalize(prompt, locale)
     matches = [
         match
         for canonical_id, locales in lexicon.entities.items()
         if (forms := locales.get(locale)) is not None
-        for match in _scan_entity(prompt, canonical_id, forms, locale)
+        for match in _scan_entity(normalized, canonical_id, forms, locale)
     ]
     return tuple(sorted(matches, key=lambda match: match.span))
 
 
 def _scan_entity(
-    prompt: str,
+    normalized: Normalized,
     canonical_id: str,
     forms: SurfaceForms,
     locale: str,
@@ -39,7 +42,7 @@ def _scan_entity(
             matched_locale=locale,
         )
         for surface_form, tier in _tiered_surface_forms(forms)
-        for span in _spans(prompt, surface_form)
+        for span in _spans(normalized, surface_form, locale)
     ]
 
 
@@ -51,20 +54,15 @@ def _tiered_surface_forms(forms: SurfaceForms) -> list[tuple[str, ScoreTier]]:
     return tiered
 
 
-def _spans(prompt: str, surface_form: str) -> list[tuple[int, int]]:
+def _spans(
+    normalized: Normalized, surface_form: str, locale: str
+) -> list[tuple[int, int]]:
     """Whole-word occurrences of `surface_form`, as offsets into the original prompt."""
-    pattern = rf"(?<!\w){re.escape(_normalize(surface_form))}(?!\w)"
+    folded = normalize_text(surface_form, locale)
+    if not folded:
+        return []
+    pattern = rf"(?<!\w){re.escape(folded)}(?!\w)"
     return [
-        (found.start(), found.end())
-        for found in re.finditer(pattern, _normalize(prompt))
+        normalized.to_original_span(found.start(), found.end())
+        for found in re.finditer(pattern, normalized.text)
     ]
-
-
-def _normalize(text: str) -> str:
-    """Trivial casing pass — accent stripping and script rules land with fuzzy matching.
-
-    Spans are offsets into the *original* prompt, which holds while normalization
-    is length-preserving. The few casefoldings that are not (e.g. "ß" → "ss") need
-    the offset map the normalization plan introduces.
-    """
-    return text.casefold()

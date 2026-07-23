@@ -29,7 +29,7 @@ The project's ubiquitous language. Code, docs, plans, and issues use these terms
 
 ## Pipeline vocabulary (branch-735 heritage)
 
-The deterministic core pipeline, in order: **normalize → lexicon scan → fuzzy pass → match report**. The branch-735 test suite preserved in `.claude/plan/` is the behavioral spec.
+The deterministic core pipeline, in order: **normalize → lexicon scan → fuzzy pass → match report**. The behavioral spec is `.claude/plan/735-python-prompt-transformer-recon.md`, which records the branch-735 score policy, span mapping, and edit budgets. The test suites it describes are *not* preserved here — they exist only in the `lng` repo at commit `2696db09^` under `tools/lng-ai-prompt/`, and this port is a clean-room reimplementation of the documented design.
 
 ## Containers
 
