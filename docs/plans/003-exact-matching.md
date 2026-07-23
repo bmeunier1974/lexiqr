@@ -11,7 +11,7 @@ The skeleton matches one literal surface form. Real prompts need the full determ
 
 ## Solution
 
-Port the branch-735 normalize → lexicon scan → match report pipeline (behavioral spec: the preserved matcher/normalizer test suites). Normalization casefolds and strips diacritics for Latin-script locales while maintaining an offset map so spans always reference the original text; Arabic locales match script-preserving. The scan finds all surface-form occurrences, resolves overlaps deterministically, and orders matches by score tier (preferred > alternate > canonical) with a documented, stable tiebreak.
+Port the branch-735 normalize → lexicon scan → match report pipeline (behavioral spec: `.claude/plan/735-python-prompt-transformer-recon.md`, which documents the design; the suites it describes are not preserved in this repo). Normalization casefolds and strips diacritics for Latin-script locales while maintaining an offset map so spans always reference the original text; Arabic locales match script-preserving. The scan finds all surface-form occurrences and resolves overlaps deterministically — longest span wins, then score tier (preferred > alternate > canonical), then earliest start, then canonical ID — and orders the surviving matches by span start position in the original text.
 
 ## Scope
 

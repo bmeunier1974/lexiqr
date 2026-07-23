@@ -11,13 +11,15 @@ from __future__ import annotations
 from lexiqr.index import SurfaceFormIndex
 from lexiqr.lexicon import Lexicon
 from lexiqr.normalizer import normalize
+from lexiqr.overlaps import resolve
 from lexiqr.types import EntityMatch
 
 
 def scan(prompt: str, lexicon: Lexicon, locale: str) -> tuple[EntityMatch, ...]:
     """Find every exact occurrence of a surface form of `locale` in `prompt`."""
     normalized = normalize(prompt, locale)
-    matches = [
+    hits = SurfaceFormIndex.build(lexicon, locale).scan(normalized.text)
+    return tuple(
         EntityMatch(
             canonical_id=hit.canonical_id,
             surface_form=hit.surface_form,
@@ -25,6 +27,5 @@ def scan(prompt: str, lexicon: Lexicon, locale: str) -> tuple[EntityMatch, ...]:
             score_tier=hit.score_tier,
             matched_locale=locale,
         )
-        for hit in SurfaceFormIndex.build(lexicon, locale).scan(normalized.text)
-    ]
-    return tuple(sorted(matches, key=lambda match: match.span))
+        for hit in resolve(hits)
+    )
