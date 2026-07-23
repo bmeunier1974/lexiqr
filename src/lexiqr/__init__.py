@@ -5,5 +5,6 @@ needs goes through `EntityResolver` (ADR 0002).
 """
 
 from lexiqr.resolver import EntityResolver
+from lexiqr.types import EntityMatch, MatchReport, ScoreTier
 
-__all__ = ["EntityResolver"]
+__all__ = ["EntityMatch", "EntityResolver", "MatchReport", "ScoreTier"]
