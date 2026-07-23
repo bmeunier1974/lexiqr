@@ -42,6 +42,20 @@ def test_flooff_fixture_maps_the_surface_form_flooff_to_canonical_id_product() -
     )
 
 
+def test_a_document_that_passes_the_schema_also_loads_in_core(
+    validator: Draft202012Validator,
+) -> None:
+    """The ADR 0003 equivalence guarantee: schema-pass implies core-load."""
+    from lexiqr import EntityResolver
+
+    document = load(FIXTURE_PATH)
+    validator.validate(document)
+
+    report = EntityResolver.from_dict(document).transform("wo ist flooff", "de-DE")
+
+    assert [match.canonical_id for match in report.matches] == ["product"]
+
+
 def test_a_lexicon_without_a_schema_version_is_rejected(
     validator: Draft202012Validator,
 ) -> None:

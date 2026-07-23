@@ -27,6 +27,28 @@ def test_transform_echoes_the_original_prompt_and_the_resolved_locale() -> None:
     assert report.locale == "de-DE"
 
 
+def test_flooff_resolves_to_the_product_entity_at_its_span_in_the_prompt() -> None:
+    resolver = EntityResolver.from_file(FIXTURE_PATH)
+
+    report = resolver.transform("wo ist flooff", "de-DE")
+
+    assert len(report.matches) == 1
+    match = report.matches[0]
+    assert match.canonical_id == "product"
+    assert match.surface_form == "flooff"
+    assert match.span == (7, 13)
+    assert "wo ist flooff"[match.span[0] : match.span[1]] == "flooff"
+
+
+def test_a_hit_on_a_preferred_surface_form_scores_in_the_preferred_tier() -> None:
+    from lexiqr import ScoreTier
+
+    report = EntityResolver.from_file(FIXTURE_PATH).transform("wo ist flooff", "de-DE")
+
+    assert report.matches[0].score_tier is ScoreTier.PREFERRED
+    assert report.matches[0].matched_locale == "de-DE"
+
+
 def test_a_resolver_built_from_a_dict_behaves_like_one_built_from_the_file(
     lexicon: Any,
 ) -> None:

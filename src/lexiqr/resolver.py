@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from lexiqr.lexicon import Lexicon
+from lexiqr.matcher import scan
 from lexiqr.types import MatchReport
 
 
@@ -31,4 +32,8 @@ class EntityResolver:
 
     def transform(self, prompt: str, locale: str) -> MatchReport:
         """Resolve the jargon in `prompt`, read in `locale`, to canonical entities."""
-        return MatchReport(prompt=prompt, locale=locale, matches=())
+        return MatchReport(
+            prompt=prompt,
+            locale=locale,
+            matches=scan(prompt, self._lexicon, locale),
+        )
