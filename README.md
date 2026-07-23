@@ -36,6 +36,8 @@ Cross-container truth lives at the root:
 - [CONTEXT.md](CONTEXT.md) — the project glossary
 - [docs/adr/](docs/adr/) — architecture decision records (repo shape, contracts)
 - [docs/plans/](docs/plans/) — dependency-ordered implementation plans
+- [docs/lexicon-authoring.md](docs/lexicon-authoring.md) — writing and validating a lexicon
+  file, for authors who never install lexiqr
 - [docs/lexicon-semantic-checks.md](docs/lexicon-semantic-checks.md) — the complete list of
   checks core enforces beyond the published schema, and why
 
