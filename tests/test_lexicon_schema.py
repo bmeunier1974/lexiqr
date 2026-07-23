@@ -16,6 +16,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 SCHEMA_PATH = REPO_ROOT / "schema" / "lexicon.v1.schema.json"
 FIXTURE_PATH = REPO_ROOT / "examples" / "flooff.lexicon.json"
 VALID_CORPUS = REPO_ROOT / "schema" / "fixtures" / "valid"
+INVALID_CORPUS = REPO_ROOT / "schema" / "fixtures" / "invalid"
 
 
 def load(path: Path) -> Any:
@@ -40,6 +41,21 @@ def test_every_valid_corpus_fixture_passes_the_published_schema(
 
     assert fixtures, f"no valid fixtures found in {VALID_CORPUS}"
     for fixture in fixtures:
+        validator.validate(load(fixture))
+
+
+@pytest.mark.parametrize(
+    "fixture", sorted(INVALID_CORPUS.glob("*.lexicon.json")), ids=lambda p: p.stem
+)
+def test_every_structurally_invalid_fixture_is_rejected_by_the_schema_too(
+    fixture: Path, validator: Draft202012Validator
+) -> None:
+    """These fixtures are structural by construction, not semantic.
+
+    A fixture the schema *accepts* but core rejects is a licensed divergence
+    under ADR 0003 — it belongs in the documented semantic set, not here.
+    """
+    with pytest.raises(ValidationError):
         validator.validate(load(fixture))
 
 

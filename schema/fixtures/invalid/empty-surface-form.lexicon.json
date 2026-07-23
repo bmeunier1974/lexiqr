@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "1",
+  "defaultLocale": "de-DE",
+  "entities": {
+    "product": {
+      "locales": {
+        "de-DE": {
+          "preferred": { "singular": "" }
+        }
+      }
+    }
+  }
+}
