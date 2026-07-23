@@ -78,10 +78,10 @@ Status lifecycle: `mapped → planned → epic → shipped`.
 | C5 — typo-tolerant matching | core | [004](docs/plans/004-fuzzy-matching.md) | [lexiqr#4](https://github.com/bmeunier1974/lexiqr/issues/4) | epic |
 | C6 — locale fallback chain | core | [005](docs/plans/005-locale-fallback.md) | [lexiqr#5](https://github.com/bmeunier1974/lexiqr/issues/5) | epic |
 | C7 — accent/script handling | core | [003](docs/plans/003-exact-matching.md) | [lexiqr#3](https://github.com/bmeunier1974/lexiqr/issues/3) | epic |
-| C8 — bounded adversarial input | core | [007](docs/plans/007-hardening.md) | | planned |
-| C9 — determinism guarantee | core, delivery | [007](docs/plans/007-hardening.md) | | planned |
+| C8 — bounded adversarial input | core | [007](docs/plans/007-hardening.md) | [lexiqr#7](https://github.com/bmeunier1974/lexiqr/issues/7) | epic |
+| C9 — determinism guarantee | core, delivery | [007](docs/plans/007-hardening.md) | [lexiqr#7](https://github.com/bmeunier1974/lexiqr/issues/7) | epic |
 | C10 — py.typed / strict typing | core, delivery | [002](docs/plans/002-foundations.md) | [lexiqr#2](https://github.com/bmeunier1974/lexiqr/issues/2) | epic |
-| C11 — CI-enforced perf envelope | core, delivery | [007](docs/plans/007-hardening.md) | | planned |
+| C11 — CI-enforced perf envelope | core, delivery | [007](docs/plans/007-hardening.md) | [lexiqr#7](https://github.com/bmeunier1974/lexiqr/issues/7) | epic |
 | C12 — README quickstart (flooff) | core, delivery | [008](docs/plans/008-release.md) | | planned |
 | C13 — published JSON Schema | schema | [002](docs/plans/002-foundations.md) | [lexiqr#2](https://github.com/bmeunier1974/lexiqr/issues/2) | epic |
 | C14 — `lexiqr validate` | cli | [006](docs/plans/006-cli.md) | [lexiqr#6](https://github.com/bmeunier1974/lexiqr/issues/6) | epic |
