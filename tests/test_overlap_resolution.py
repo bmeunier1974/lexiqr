@@ -127,6 +127,52 @@ def test_the_report_is_ordered_by_position_not_by_tier() -> None:
     ]
 
 
+def test_an_exact_hit_outranks_an_overlapping_fuzzy_hit_even_a_longer_one() -> None:
+    """The one new dimension: kind is asked before span length.
+
+    A correctly spelled word must never be displaced by a fuzzy guess, so where
+    the two kinds claim overlapping text the exact hit wins outright — even when
+    the fuzzy hit spans more of the prompt.
+    """
+    from lexiqr.overlaps import Candidate, resolve
+
+    exact = Candidate("product", "widget", (4, 10), ScoreTier.CANONICAL, is_fuzzy=False)
+    longer_fuzzy = Candidate(
+        "gadget", "gadgetry", (0, 12), ScoreTier.PREFERRED, is_fuzzy=True
+    )
+
+    assert resolve((longer_fuzzy, exact)) == (exact,)
+
+
+def test_a_correctly_spelled_and_a_misspelled_term_both_resolve() -> None:
+    resolver = EntityResolver.from_dict(
+        lexicon("en-GB", product={"preferred": {"singular": "widget"}})
+    )
+
+    report = resolver.transform("a widget beside a widgt", "en-GB")
+
+    kinds = [(m.canonical_id, m.correction) for m in report.matches]
+    assert kinds == [("product", None), ("product", "widgt")]
+
+
+def test_a_region_the_exact_scan_claimed_yields_no_fuzzy_candidate() -> None:
+    """"ticket" is one edit from "ticker", but the exact scan already claimed it,
+    so tolerance never re-examines the word and no second, fuzzy match appears."""
+    resolver = EntityResolver.from_dict(
+        lexicon(
+            "en-GB",
+            product={"preferred": {"singular": "ticket"}},
+            index={"preferred": {"singular": "ticker"}},
+        )
+    )
+
+    report = resolver.transform("the ticket please", "en-GB")
+
+    assert [(m.canonical_id, m.correction) for m in report.matches] == [
+        ("product", None)
+    ]
+
+
 def test_a_rebuilt_resolver_reports_the_same_thing_as_the_first_one() -> None:
     """Determinism survives a rebuild of the resolver, not just a repeated call."""
     document = lexicon(

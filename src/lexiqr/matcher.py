@@ -6,6 +6,10 @@ normalized text, because that is the only text their patterns were folded to
 fit. A caller works in the prompt they typed. Every hit — exact or fuzzy —
 crosses that line exactly once, here, and a fuzzy hit picks up its correction
 in the same crossing: the original words its span points at.
+
+The exact scan claims what it can; the fuzzy pass then looks only at the words
+no exact hit touched. Both kinds meet in one overlap resolver, which owns the
+precedence between them — an exact hit is never displaced by a fuzzy guess.
 """
 
 from __future__ import annotations
@@ -14,7 +18,7 @@ from lexiqr import fuzzy
 from lexiqr.index import SurfaceFormIndex
 from lexiqr.lexicon import Lexicon
 from lexiqr.normalizer import Normalized, normalize
-from lexiqr.overlaps import resolve
+from lexiqr.overlaps import Candidate, resolve
 from lexiqr.types import EntityMatch
 
 
@@ -23,35 +27,51 @@ def scan(prompt: str, lexicon: Lexicon, locale: str) -> tuple[EntityMatch, ...]:
     normalized = normalize(prompt, locale)
     index = SurfaceFormIndex.build(lexicon, locale)
 
-    exact = resolve(index.scan(normalized.text))
+    exact = index.scan(normalized.text)
     covered = tuple(hit.span for hit in exact)
     fuzzy_hits = fuzzy.scan(normalized, covered, index)
 
-    matches = [
-        EntityMatch(
+    candidates = tuple(
+        Candidate(
             canonical_id=hit.canonical_id,
             surface_form=hit.surface_form,
-            span=normalized.to_original_span(*hit.span),
+            span=hit.span,
             score_tier=hit.score_tier,
-            matched_locale=locale,
+            is_fuzzy=False,
         )
         for hit in exact
-    ] + [
-        _fuzzy_match(hit, normalized, prompt, locale) for hit in fuzzy_hits
-    ]
-    return tuple(sorted(matches, key=lambda match: match.span))
+    ) + tuple(
+        Candidate(
+            canonical_id=hit.canonical_id,
+            surface_form=hit.surface_form,
+            span=hit.span,
+            score_tier=hit.score_tier,
+            is_fuzzy=True,
+        )
+        for hit in fuzzy_hits
+    )
+
+    return tuple(
+        _to_match(candidate, normalized, prompt, locale)
+        for candidate in resolve(candidates)
+    )
 
 
-def _fuzzy_match(
-    hit: fuzzy.FuzzyHit, normalized: Normalized, prompt: str, locale: str
+def _to_match(
+    candidate: Candidate, normalized: Normalized, prompt: str, locale: str
 ) -> EntityMatch:
-    """Build a fuzzy match, its correction naming what the user actually typed."""
-    start, end = normalized.to_original_span(*hit.span)
+    """Translate a surviving candidate back to the prompt the caller typed.
+
+    A fuzzy candidate carries a correction — the original words its span points
+    at, so a highlighted span still marks what the user actually typed. An exact
+    one carries none.
+    """
+    start, end = normalized.to_original_span(*candidate.span)
     return EntityMatch(
-        canonical_id=hit.canonical_id,
-        surface_form=hit.surface_form,
+        canonical_id=candidate.canonical_id,
+        surface_form=candidate.surface_form,
         span=(start, end),
-        score_tier=hit.score_tier,
+        score_tier=candidate.score_tier,
         matched_locale=locale,
-        correction=prompt[start:end],
+        correction=prompt[start:end] if candidate.is_fuzzy else None,
     )
