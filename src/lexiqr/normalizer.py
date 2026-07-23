@@ -23,6 +23,11 @@ from __future__ import annotations
 import unicodedata
 from dataclasses import dataclass
 
+#: Languages whose combining marks carry meaning rather than decoration, and so
+#: are matched script-preserving. Arabic is the one v1 commits to; the guarantee
+#: is that its text is not mangled, not that its matching is tuned.
+_SCRIPT_PRESERVING_LANGUAGES = frozenset({"ar"})
+
 
 @dataclass(frozen=True)
 class Normalized:
@@ -59,6 +64,25 @@ def normalize_text(text: str, locale: str) -> str:
 
 def _fold_character(character: str, locale: str) -> str:
     """Fold one character, which may yield several characters or none at all."""
+    if not _strips_diacritics(locale):
+        return character.casefold()
     decomposed = unicodedata.normalize("NFKD", character)
     stripped = "".join(part for part in decomposed if not unicodedata.combining(part))
     return stripped.casefold()
+
+
+def _strips_diacritics(locale: str) -> bool:
+    """Whether `locale`'s script treats its combining marks as discardable.
+
+    A French acute is a spelling variant a user may reasonably omit. An Arabic
+    haraka is not, and the hamza on `أ` is not a mark on `ا` — it is what makes
+    it a different letter. Stripping either does not fold Arabic, it corrupts
+    it, so Arabic is matched script-preserving: casefolded and otherwise left
+    exactly as written.
+    """
+    return _language(locale) not in _SCRIPT_PRESERVING_LANGUAGES
+
+
+def _language(locale: str) -> str:
+    """The language subtag of a BCP 47 tag — `ar` for `ar-EG`."""
+    return locale.split("-")[0].casefold()

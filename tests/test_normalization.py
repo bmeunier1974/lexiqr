@@ -75,3 +75,44 @@ def test_a_span_after_a_stripped_accent_is_not_shifted_by_the_stripping() -> Non
 
     start, end = report.matches[0].span
     assert report.prompt[start:end] == "diffusés"
+
+
+def test_arabic_keeps_its_diacritics_through_normalisation() -> None:
+    """Harakat are combining marks, but they are not French accents.
+
+    Latin-script folding treats a combining mark as decoration to discard.
+    Applied to Arabic that is not folding, it is damage.
+    """
+    from lexiqr.normalizer import normalize
+
+    folded = normalize("مُنتَج", "ar-EG")
+
+    assert folded.text == "مُنتَج"
+
+
+def test_arabic_letters_that_differ_only_by_hamza_are_not_conflated() -> None:
+    """`أ` decomposes to `ا` + hamza; stripping the hamza invents a match."""
+    resolver = EntityResolver.from_dict(lexicon("ar-EG", "اسم"))
+
+    report = resolver.transform("أسم الحلقة", "ar-EG")
+
+    assert report.matches == ()
+
+
+def test_an_arabic_prompt_resolves_with_a_span_that_slices_the_original() -> None:
+    resolver = EntityResolver.from_dict(lexicon("ar-EG", "منتج", plural="منتجات"))
+
+    report = resolver.transform("أين منتجات الشركة", "ar-EG")
+
+    assert [match.canonical_id for match in report.matches] == ["episode"]
+    start, end = report.matches[0].span
+    assert report.prompt[start:end] == "منتجات"
+
+
+def test_an_arabic_prompt_with_harakat_matches_a_form_written_the_same_way() -> None:
+    resolver = EntityResolver.from_dict(lexicon("ar-EG", "مُنتَج"))
+
+    report = resolver.transform("أين مُنتَج الشركة", "ar-EG")
+
+    start, end = report.matches[0].span
+    assert report.prompt[start:end] == "مُنتَج"
