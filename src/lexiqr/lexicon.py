@@ -11,6 +11,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from lexiqr.errors import ValidationError
+
+#: The one lexicon format version core implements (ADR 0003).
+SCHEMA_VERSION = "1"
+
 
 @dataclass(frozen=True)
 class SurfaceForms:
@@ -31,6 +36,15 @@ class Lexicon:
 
     @classmethod
     def from_dict(cls, document: dict[str, Any]) -> Lexicon:
+        # The version comes first: core cannot interpret a document whose
+        # format it does not implement, so it must not try to read one.
+        declared = document.get("schemaVersion")
+        if declared != SCHEMA_VERSION:
+            raise ValidationError(
+                f"Unsupported lexicon schemaVersion {declared!r}: this version of "
+                f"lexiqr implements schemaVersion {SCHEMA_VERSION!r}.",
+                field="schemaVersion",
+            )
         entities = {
             canonical_id: {
                 locale: _surface_forms(forms)
