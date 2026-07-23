@@ -74,10 +74,10 @@ Status lifecycle: `mapped → planned → epic → shipped`.
 | C1 — pip install from PyPI | delivery | [008](docs/plans/008-release.md) | | planned |
 | C2 — init from lexicon data | core | [002](docs/plans/002-foundations.md) | [lexiqr#2](https://github.com/bmeunier1974/lexiqr/issues/2) | epic |
 | C3 — precise validation errors | core | [002](docs/plans/002-foundations.md) | [lexiqr#2](https://github.com/bmeunier1974/lexiqr/issues/2) | epic |
-| C4 — transform() match report | core | [003](docs/plans/003-exact-matching.md) | | planned |
+| C4 — transform() match report | core | [003](docs/plans/003-exact-matching.md) | [lexiqr#3](https://github.com/bmeunier1974/lexiqr/issues/3) | epic |
 | C5 — typo-tolerant matching | core | [004](docs/plans/004-fuzzy-matching.md) | | planned |
 | C6 — locale fallback chain | core | [005](docs/plans/005-locale-fallback.md) | | planned |
-| C7 — accent/script handling | core | [003](docs/plans/003-exact-matching.md) | | planned |
+| C7 — accent/script handling | core | [003](docs/plans/003-exact-matching.md) | [lexiqr#3](https://github.com/bmeunier1974/lexiqr/issues/3) | epic |
 | C8 — bounded adversarial input | core | [007](docs/plans/007-hardening.md) | | planned |
 | C9 — determinism guarantee | core, delivery | [007](docs/plans/007-hardening.md) | | planned |
 | C10 — py.typed / strict typing | core, delivery | [002](docs/plans/002-foundations.md) | [lexiqr#2](https://github.com/bmeunier1974/lexiqr/issues/2) | epic |
