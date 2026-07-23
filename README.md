@@ -40,6 +40,8 @@ Cross-container truth lives at the root:
   file, for authors who never install lexiqr
 - [docs/lexicon-semantic-checks.md](docs/lexicon-semantic-checks.md) — the complete list of
   checks core enforces beyond the published schema, and why
+- [docs/matching-rules.md](docs/matching-rules.md) — normalization, spans, score tiers,
+  overlap resolution and ordering: the behavior determinism makes public
 
 ## Contributing
 
