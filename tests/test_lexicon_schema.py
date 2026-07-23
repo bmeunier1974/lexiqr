@@ -1,0 +1,52 @@
+"""The published lexicon schema, checked with a standard JSON Schema validator.
+
+This is the first row of the ADR 0003 equivalence harness: a document that
+passes the published schema must later also load in core.
+"""
+
+import json
+from pathlib import Path
+from typing import Any
+
+import pytest
+from jsonschema import Draft202012Validator
+from jsonschema.exceptions import ValidationError
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+SCHEMA_PATH = REPO_ROOT / "schema" / "lexicon.v1.schema.json"
+FIXTURE_PATH = REPO_ROOT / "examples" / "flooff.lexicon.json"
+
+
+def load(path: Path) -> Any:
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+@pytest.fixture
+def validator() -> Draft202012Validator:
+    return Draft202012Validator(load(SCHEMA_PATH))
+
+
+def test_flooff_fixture_lexicon_passes_the_published_schema(
+    validator: Draft202012Validator,
+) -> None:
+    validator.validate(load(FIXTURE_PATH))
+
+
+def test_flooff_fixture_maps_the_surface_form_flooff_to_canonical_id_product() -> None:
+    lexicon = load(FIXTURE_PATH)
+
+    assert lexicon["defaultLocale"] == "de-DE"
+    assert (
+        lexicon["entities"]["product"]["locales"]["de-DE"]["preferred"]["singular"]
+        == "flooff"
+    )
+
+
+def test_a_lexicon_without_a_schema_version_is_rejected(
+    validator: Draft202012Validator,
+) -> None:
+    lexicon = load(FIXTURE_PATH)
+    del lexicon["schemaVersion"]
+
+    with pytest.raises(ValidationError):
+        validator.validate(lexicon)
