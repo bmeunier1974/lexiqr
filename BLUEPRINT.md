@@ -72,20 +72,20 @@ Status lifecycle: `mapped → planned → epic → shipped`.
 | Capability | Container(s) | Plan | Epic | Status |
 |------------|--------------|------|------|--------|
 | C1 — pip install from PyPI | delivery | [008](docs/plans/008-release.md) | | planned |
-| C2 — init from lexicon data | core | [002](docs/plans/002-foundations.md) | | planned |
-| C3 — precise validation errors | core | [002](docs/plans/002-foundations.md) | | planned |
+| C2 — init from lexicon data | core | [002](docs/plans/002-foundations.md) | [lexiqr#2](https://github.com/bmeunier1974/lexiqr/issues/2) | epic |
+| C3 — precise validation errors | core | [002](docs/plans/002-foundations.md) | [lexiqr#2](https://github.com/bmeunier1974/lexiqr/issues/2) | epic |
 | C4 — transform() match report | core | [003](docs/plans/003-exact-matching.md) | | planned |
 | C5 — typo-tolerant matching | core | [004](docs/plans/004-fuzzy-matching.md) | | planned |
 | C6 — locale fallback chain | core | [005](docs/plans/005-locale-fallback.md) | | planned |
 | C7 — accent/script handling | core | [003](docs/plans/003-exact-matching.md) | | planned |
 | C8 — bounded adversarial input | core | [007](docs/plans/007-hardening.md) | | planned |
 | C9 — determinism guarantee | core, delivery | [007](docs/plans/007-hardening.md) | | planned |
-| C10 — py.typed / strict typing | core, delivery | [002](docs/plans/002-foundations.md) | | planned |
+| C10 — py.typed / strict typing | core, delivery | [002](docs/plans/002-foundations.md) | [lexiqr#2](https://github.com/bmeunier1974/lexiqr/issues/2) | epic |
 | C11 — CI-enforced perf envelope | core, delivery | [007](docs/plans/007-hardening.md) | | planned |
 | C12 — README quickstart (flooff) | core, delivery | [008](docs/plans/008-release.md) | | planned |
-| C13 — published JSON Schema | schema | [002](docs/plans/002-foundations.md) | | planned |
+| C13 — published JSON Schema | schema | [002](docs/plans/002-foundations.md) | [lexiqr#2](https://github.com/bmeunier1974/lexiqr/issues/2) | epic |
 | C14 — `lexiqr validate` | cli | [006](docs/plans/006-cli.md) | | planned |
 | C15 — `lexiqr try` | cli | [006](docs/plans/006-cli.md) | | planned |
-| C16 — PR CI (lint/type/test matrix) | delivery | [002](docs/plans/002-foundations.md) | | planned |
+| C16 — PR CI (lint/type/test matrix) | delivery | [002](docs/plans/002-foundations.md) | [lexiqr#2](https://github.com/bmeunier1974/lexiqr/issues/2) | epic |
 | C17 — tag→PyPI trusted publishing | delivery | [008](docs/plans/008-release.md) | | planned |
 | C18 — one-command dev env | delivery | [001](docs/plans/001-walking-skeleton.md) | [lexiqr#1](https://github.com/bmeunier1974/lexiqr/issues/1) | epic |
