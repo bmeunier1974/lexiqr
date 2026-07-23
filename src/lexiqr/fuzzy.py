@@ -35,13 +35,27 @@ from lexiqr.types import ScoreTier
 #: as standing alone, so residue tokens line up with what it already claimed.
 _WORD = re.compile(r"\w+")
 
-#: Provisional budget for this slice. Surface forms of three folded characters
-#: or fewer are matched exactly only — too little evidence to tolerate an edit
-#: without colliding with unrelated short words. The length-aware table that
-#: scales this with form length, and the published threshold, land in story #30.
-_MIN_FUZZY_LENGTH = 4
-_MAX_DISTANCE = 2
+#: Tolerance scales with how much evidence a surface form carries. A three-letter
+#: jargon term gets no edits — otherwise it collides with every other short word
+#: in the prompt and no one can explain why "cat" resolved to `product`. Four to
+#: five characters earn a single edit, six or more earn two. The boundaries are
+#: the branch-735 table, published in docs/matching-rules.md (story #35).
+_LONG_FORM = 6
+_MEDIUM_FORM = 4
+
+#: On top of the distance budget: a candidate must also be this similar, so the
+#: library never reaches for a wildly different word just because the distance
+#: happened to fit. Below it, nothing matches.
 _MIN_SIMILARITY = 0.90
+
+
+def _edit_budget(folded_length: int) -> int:
+    """The edit budget a surface form of this folded length earns."""
+    if folded_length >= _LONG_FORM:
+        return 2
+    if folded_length >= _MEDIUM_FORM:
+        return 1
+    return 0
 
 #: Best tier first, matching the overlap resolver's ranking. Used only to break
 #: ties between candidates that are otherwise equally good corrections.
@@ -123,10 +137,11 @@ def _best_candidate(token: str, forms: tuple[SurfaceForm, ...]) -> SurfaceForm |
     best: SurfaceForm | None = None
     best_key: tuple[int, float, int, str] | None = None
     for form in forms:
-        if len(form.folded) < _MIN_FUZZY_LENGTH:
+        budget = _edit_budget(len(form.folded))
+        if budget == 0:
             continue
         distance = DamerauLevenshtein.distance(token, form.folded)
-        if distance > _MAX_DISTANCE:
+        if distance > budget:
             continue
         similarity = JaroWinkler.similarity(token, form.folded)
         if similarity < _MIN_SIMILARITY:

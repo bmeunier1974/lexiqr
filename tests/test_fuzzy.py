@@ -86,6 +86,58 @@ def test_a_word_beyond_the_budget_returns_no_match_rather_than_a_wrong_one() -> 
     assert report.matches == ()
 
 
+def resolves(locale: str, canonical_id: str, singular: str, prompt: str) -> bool:
+    """Whether `prompt` resolves to `canonical_id` through the fuzzy pass."""
+    resolver = EntityResolver.from_dict(one_entity(locale, canonical_id, singular))
+    matches = resolver.transform(prompt, locale).matches
+    return any(match.canonical_id == canonical_id for match in matches)
+
+
+def test_a_short_surface_form_matches_exactly_only() -> None:
+    # "cat" is three characters: budget 0. A one-edit "cot" must not resolve,
+    # or every three-letter word in a prompt would collide with it.
+    assert not resolves("en-GB", "animal", "cat", "the cot sat")
+
+
+def test_a_medium_surface_form_resolves_through_one_edit() -> None:
+    # "table" is five characters: budget 1. "tablo" is one substitution away.
+    assert resolves("en-GB", "furniture", "table", "clear the tablo")
+
+
+def test_a_medium_surface_form_rejects_a_two_edit_variant() -> None:
+    # "tablexy" is two edits from "table" yet still highly similar, so only the
+    # length-aware budget — not the similarity threshold — can turn it away.
+    assert not resolves("en-GB", "furniture", "table", "clear the tablexy")
+
+
+def test_a_long_surface_form_resolves_through_two_edits() -> None:
+    # "flooff" is six characters: budget 2. "flof" is two edits away.
+    assert resolves("de-DE", "product", "flooff", "wo ist flof")
+
+
+def test_a_long_surface_form_rejects_a_three_edit_variant() -> None:
+    assert not resolves("de-DE", "product", "flooff", "wo ist flo")
+
+
+def test_a_four_character_form_resolves_through_one_edit() -> None:
+    # The just-inside case of the three/four boundary: at four characters the
+    # budget opens to one edit, where at three it was closed.
+    assert resolves("en-GB", "record", "item", "add itemx now")
+
+
+def test_a_transposition_of_adjacent_characters_costs_one_edit() -> None:
+    # "tabel" swaps two adjacent letters of the five-character "table". Plain
+    # edit distance would score that two and exceed the budget of one; a
+    # Damerau-style distance scores it one, so it resolves.
+    assert resolves("en-GB", "furniture", "table", "clear the tabel")
+
+
+def test_a_candidate_within_budget_but_below_similarity_does_not_resolve() -> None:
+    # "flooaa" is two edits from "flooff" — inside the six-character budget — but
+    # too dissimilar to stand behind, so the threshold turns it away.
+    assert not resolves("de-DE", "product", "flooff", "wo ist flooaa")
+
+
 def test_the_fuzzy_pass_is_isolated_no_similarity_reasoning_leaks_elsewhere() -> None:
     import lexiqr
 
