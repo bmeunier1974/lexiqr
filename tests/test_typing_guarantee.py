@@ -214,7 +214,7 @@ def inspect(path: Path) -> None:
         "str",
         "tuple[lexiqr.types.EntityMatch, ...]",
         "tuple[int, int]",
-        "lexiqr.types.ScoreTier | None",
+        "lexiqr.types.ScoreTier",
     ],
 )
 def test_nothing_a_consumer_touches_resolves_to_any(

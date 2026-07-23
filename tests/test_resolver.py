@@ -75,11 +75,17 @@ def test_a_match_report_is_frozen_so_callers_cannot_rewrite_a_result() -> None:
         report.prompt = "tampered"  # type: ignore[misc]
 
 
-def test_an_entity_match_carries_the_full_field_set_with_deferred_defaults() -> None:
-    from lexiqr import EntityMatch
+def test_an_entity_match_carries_the_full_field_set_with_correction_deferred() -> None:
+    from lexiqr import EntityMatch, ScoreTier
 
-    match = EntityMatch(canonical_id="product", surface_form="flooff", span=(8, 14))
+    match = EntityMatch(
+        canonical_id="product",
+        surface_form="flooff",
+        span=(8, 14),
+        score_tier=ScoreTier.PREFERRED,
+        matched_locale="de-DE",
+    )
 
-    assert match.score_tier is None
+    assert match.score_tier is ScoreTier.PREFERRED
+    assert match.matched_locale == "de-DE"
     assert match.correction is None
-    assert match.matched_locale is None
