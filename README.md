@@ -37,6 +37,16 @@ Cross-container truth lives at the root:
 - [docs/adr/](docs/adr/) — architecture decision records (repo shape, contracts)
 - [docs/plans/](docs/plans/) — dependency-ordered implementation plans
 
+## Contributing
+
+Two steps, no setup document to drift out of date — [uv](https://docs.astral.sh/uv/) does the rest:
+
+```bash
+git clone https://github.com/bmeunier1974/lexiqr.git && cd lexiqr
+uv sync          # creates the venv and installs lexiqr plus its dev tools
+uv run pytest    # the same suite CI runs on every push and pull request
+```
+
 ## License
 
 MIT
