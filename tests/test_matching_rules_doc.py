@@ -39,12 +39,58 @@ def test_the_tiebreaks_are_stated_in_the_order_the_resolver_applies_them(
 
 @pytest.mark.parametrize(
     "topic",
-    ["Arabic", "diacritic", "offset", "preferred", "alternate", "determinis"],
+    [
+        "Arabic",
+        "diacritic",
+        "offset",
+        "preferred",
+        "alternate",
+        "determinis",
+        "fuzzy",
+        "correction",
+        "swapped",
+        "transposition",
+    ],
 )
 def test_the_document_covers_every_observable_part_of_matching(
     rules: str, topic: str
 ) -> None:
     assert topic in rules
+
+
+def test_the_fuzzy_pass_and_its_budget_table_are_documented(rules: str) -> None:
+    section = rules.split("## 8.")[1]
+
+    assert "uncovered" in section  # fuzzy only examines what exact left behind
+    assert "Edit budget" in section  # the table's own header
+    assert "|" in section  # published as a table, not prose
+    assert "exact match only" in section
+    assert "1 edit" in section
+    assert "2 edits" in section
+    assert "transposition" in section
+    assert "similar enough" in section  # threshold on top of the budget
+
+
+def test_the_fuzzy_ranking_tiebreaks_are_listed_in_applied_order(rules: str) -> None:
+    ranking = rules.split("### Ranking")[1].split("###")[0]
+    positions = [
+        ranking.index("similarity"),
+        ranking.index("edit distance"),
+        ranking.index("score tier"),
+        ranking.index("earliest start"),
+    ]
+
+    assert positions == sorted(positions)
+
+
+def test_the_fuzzy_keyword_precedence_and_non_goals_are_documented(rules: str) -> None:
+    section = rules.split("## 8.")[1]
+
+    assert "fuzzy=False" in section
+    assert "semver" in section  # the pass is public, semver-governed behavior
+    assert "outranks" in section  # exact beats an overlapping fuzzy hit
+    assert "phonetic" in section  # a stated non-goal, not a shipped feature
+    assert "semantic" in section
 
 
 def test_the_document_is_discoverable_from_the_readme() -> None:

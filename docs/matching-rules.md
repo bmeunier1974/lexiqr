@@ -97,6 +97,11 @@ That check compares casefolded text, so forms differing only by accent —
 `épisode` and `episode` in two different entities — pass it and then collide
 once folded. Rule 4 is what settles those.
 
+These four rules order matches of the **same kind**. When an exact match and a
+fuzzy one (§8) claim overlapping text, kind is asked first and the exact match
+always wins — whatever the spans. A word you spelled correctly is never
+displaced by a guess about one you didn't.
+
 Matches that do not overlap are all kept. A prompt mentioning an entity twice
 reports both spans; a prompt naming three entities reports all three.
 
@@ -106,6 +111,100 @@ The final match list is sorted by span start in the original prompt — reading
 order, not confidence order. A `canonical`-tier match early in the sentence
 comes before a `preferred`-tier match later in it. Sort by `score_tier`
 yourself if you want them ranked by confidence.
+
+## 8. Typo tolerance: a second, fuzzy pass over what is left
+
+Matching runs in **two passes**. Everything above is the first pass — the exact
+scan — and it runs to completion first. A second, *fuzzy* pass then looks only
+at the words the exact scan left **uncovered**, never at text an exact match
+already claimed, and asks whether any of them is a near-miss of a declared
+surface form. Tolerance never rewrites a match you could already trust, and
+keeping the fuzzy pass strictly second — over the residue alone — is why it does
+not slow down prompts the exact scan already resolved. Where the two passes ever
+claim overlapping text, an exact hit **outranks** the fuzzy one outright (§6).
+
+Everything in this section is public, semver-governed behaviour, for the same
+reason the rules above are: determinism makes it observable, so you can predict
+a correction without running the matcher and rely on it not changing under you
+without a semver bump.
+
+### The edit budget scales with the length of the surface form
+
+How far a word may stray and still resolve depends on how much evidence it
+carries. A three-letter jargon term gets no tolerance at all — otherwise it
+would collide with every other short word in your prompt, and you could not
+explain why "cat" resolved to `product`. Longer forms, which carry more signal,
+tolerate more.
+
+| Surface-form length | Edit budget |
+| --- | --- |
+| 3 characters or fewer | none — exact match only |
+| 4–5 characters | 1 edit |
+| 6 or more characters | 2 edits |
+
+An edit is an inserted, deleted, or substituted character, or a **transposition**
+of two adjacent characters — which counts as **one** edit, not two, because that
+is how people actually mistype ("flooff" → "floff").
+
+### A candidate must also be similar enough
+
+The budget is a ceiling on distance, not the whole test. On top of it, a
+candidate must clear a fixed **similarity threshold** — it must be both within
+budget *and* similar enough — so the library never reaches for a wildly
+different word just because the edit count happened to fit. A typo that exceeds
+either bound simply returns no match: lexiqr fails quietly rather than
+confidently. The budget and the threshold are fixed in v1; see *What tolerance
+is not*, below.
+
+### Ranking is total, so an ambiguous typo resolves the same way every time
+
+When more than one surface form is a legal correction of the same word, they are
+ranked by a totally ordered rule, applied in order until one decides:
+
+1. **Higher similarity** wins.
+2. **Then lower edit distance.**
+3. **Then the better score tier** — preferred over alternate over canonical.
+4. **Then the earliest start position**, which orders the matches the pass emits.
+
+No tie falls through to iteration order: two forms that are otherwise identical
+under these rules are settled the same way — by the lower canonical ID, as in
+rule 6.4 — on every run, machine, and Python version.
+
+### Phrases tolerate the same errors, including swapped words
+
+A multi-word surface form is recovered from adjacent words in the residue, so a
+two-word label survives a misspelling of one of its words, and survives its two
+words being typed in the **swapped** order. "support tickte" and "ticket
+support" both resolve to a `support ticket` entity, within the same budget and
+threshold that single words obey.
+
+### Fuzzy matches carry a correction; exact matches do not
+
+Every fuzzy match populates `correction` with what you actually typed, while its
+`surface_form` names the declared form it resolved to — so you can always show a
+user, or a support ticket, that "floof" was read as "flooff". Its `span`,
+`score_tier`, `canonical_id`, and `matched_locale` mean exactly what they do on
+an exact match, and its span indexes your original prompt, so
+`report.prompt[start:end]` is the misspelling as you typed it. An exact match
+leaves `correction` as `None`; a correction present *is* the signal that
+tolerance was applied.
+
+### Turning tolerance off
+
+The `fuzzy` keyword — accepted by `EntityResolver(...)`, `EntityResolver.from_file`,
+and `EntityResolver.from_dict` — defaults to `True`, so typo tolerance works
+with no configuration. Passing `fuzzy=False` returns the resolver to exact-only
+behaviour: the fuzzy pass is skipped entirely rather than run and filtered, so
+exact-only mode is also the fast mode, and no match in any report it produces
+carries a correction. The keyword is public, semver-governed API.
+
+### What tolerance is not
+
+lexiqr does no **phonetic** (soundex-style) matching and no **semantic** or
+embedding-based similarity — those are deliberate non-goals, not gaps to be
+filled later. And there are no per-tenant tuning knobs beyond the on/off switch:
+the edit budgets, the similarity threshold, and the scorer are fixed in v1. The
+only fuzzy configuration is whether the pass runs at all.
 
 ---
 
