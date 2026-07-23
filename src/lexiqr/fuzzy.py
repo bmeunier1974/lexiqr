@@ -156,12 +156,16 @@ def _overlaps_any(span: tuple[int, int], covered: tuple[tuple[int, int], ...]) -
 def _best_candidate(token: str, forms: tuple[SurfaceForm, ...]) -> SurfaceForm | None:
     """The declared form `token` is most plausibly a misspelling of, or None.
 
-    Every step of the key is total, so a tie never falls through to the order
-    the forms happened to be compiled in: closest distance first, then highest
-    similarity, then best tier, then the form's own spelling.
+    The ranking is totally ordered, so the same typo resolves to the same form on
+    every run, machine, and Python version — determinism (C9) holds for fuzzy
+    results as it does for exact ones. In order: higher similarity, then lower
+    edit distance, then better tier, and finally the lower canonical ID and the
+    form's own spelling, so no tie ever falls through to iteration order. The
+    documented earliest-start rule orders the emitted matches and lives in the
+    overlap resolver, where positions actually differ.
     """
     best: SurfaceForm | None = None
-    best_key: tuple[int, float, int, str] | None = None
+    best_key: tuple[float, int, int, str, str] | None = None
     for form in forms:
         budget = _edit_budget(len(form.folded))
         if budget == 0:
@@ -172,7 +176,13 @@ def _best_candidate(token: str, forms: tuple[SurfaceForm, ...]) -> SurfaceForm |
         similarity = JaroWinkler.similarity(token, form.folded)
         if similarity < _MIN_SIMILARITY:
             continue
-        key = (distance, -similarity, _TIER_RANK[form.score_tier], form.folded)
+        key = (
+            -similarity,
+            distance,
+            _TIER_RANK[form.score_tier],
+            form.canonical_id,
+            form.folded,
+        )
         if best_key is None or key < best_key:
             best, best_key = form, key
     return best

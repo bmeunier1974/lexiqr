@@ -218,6 +218,104 @@ def test_a_two_word_form_obeys_the_same_budget_as_a_single_word() -> None:
     assert beyond.matches == ()
 
 
+def lexicon_of(locale: str, **entities: dict[str, Any]) -> dict[str, Any]:
+    """A multi-entity lexicon, so a test can pit two surface forms against a typo."""
+    return {
+        "schemaVersion": "1",
+        "defaultLocale": locale,
+        "entities": {
+            canonical_id: {"locales": {locale: forms}}
+            for canonical_id, forms in entities.items()
+        },
+    }
+
+
+def test_a_higher_similarity_candidate_wins_even_at_a_greater_edit_distance() -> None:
+    # "widteg" is two edits from "widget" but more similar (0.96); "wedget" is
+    # one edit but less similar (0.90). Similarity is asked first, so the more
+    # similar candidate wins despite its greater distance.
+    resolver = EntityResolver.from_dict(
+        lexicon_of(
+            "en-GB",
+            near={"preferred": {"singular": "widteg"}},
+            far={"preferred": {"singular": "wedget"}},
+        )
+    )
+
+    report = resolver.transform("the widget here", "en-GB")
+
+    assert report.matches[0].canonical_id == "near"
+
+
+def test_candidates_tied_on_similarity_are_separated_by_lower_edit_distance() -> None:
+    # "widmet" and "widetu" are equally similar to "widget" (0.9222); the
+    # one-edit "widmet" beats the two-edit "widetu".
+    resolver = EntityResolver.from_dict(
+        lexicon_of(
+            "en-GB",
+            close={"preferred": {"singular": "widmet"}},
+            distant={"preferred": {"singular": "widetu"}},
+        )
+    )
+
+    report = resolver.transform("the widget here", "en-GB")
+
+    assert report.matches[0].canonical_id == "close"
+
+
+def test_candidates_tied_on_similarity_and_distance_are_separated_by_tier() -> None:
+    # Both forms are one edit and equally similar to "widget"; the preferred
+    # form outranks the alternate one.
+    resolver = EntityResolver.from_dict(
+        lexicon_of(
+            "en-GB",
+            preferred_owner={"preferred": {"singular": "widgat"}},
+            alternate_owner={
+                "preferred": {"singular": "zzzzz"},
+                "alternates": ["widgbt"],
+            },
+        )
+    )
+
+    report = resolver.transform("the widget here", "en-GB")
+
+    assert report.matches[0].canonical_id == "preferred_owner"
+
+
+def test_equally_good_matches_are_reported_in_earliest_start_order() -> None:
+    resolver = EntityResolver.from_dict(
+        lexicon_of(
+            "en-GB",
+            product={"preferred": {"singular": "widget"}},
+            gizmo={"preferred": {"singular": "gadget"}},
+        )
+    )
+
+    report = resolver.transform("a gadgt and a widgt", "en-GB")
+
+    starts = [match.span[0] for match in report.matches]
+    assert starts == sorted(starts)
+    assert [match.canonical_id for match in report.matches] == ["gizmo", "product"]
+
+
+def test_an_ambiguous_typo_returns_the_same_correction_on_every_run() -> None:
+    # Two forms equally close to "widget" in every ranked dimension: the tie is
+    # broken by the lower canonical ID, and identically on every run.
+    document = lexicon_of(
+        "en-GB",
+        aardvark={"preferred": {"singular": "widgat"}},
+        buffalo={"preferred": {"singular": "widgbt"}},
+    )
+
+    reports = [
+        EntityResolver.from_dict(document).transform("the widget here", "en-GB")
+        for _ in range(10)
+    ]
+
+    assert len({tuple(report.matches) for report in reports}) == 1
+    assert reports[0].matches[0].canonical_id == "aardvark"
+
+
 def test_the_fuzzy_pass_is_isolated_no_similarity_reasoning_leaks_elsewhere() -> None:
     import lexiqr
 
