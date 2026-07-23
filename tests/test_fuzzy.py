@@ -176,6 +176,48 @@ def test_the_fuzzy_keyword_is_accepted_on_every_construction_path() -> None:
         assert resolver.transform("wo ist floof", "de-DE").matches == ()
 
 
+def test_a_two_word_form_resolves_when_one_word_is_misspelled() -> None:
+    resolver = EntityResolver.from_dict(
+        one_entity("en-GB", "escalation", "support ticket")
+    )
+
+    report = resolver.transform("open a support tickte now", "en-GB")
+    match = report.matches[0]
+
+    assert match.canonical_id == "escalation"
+    assert match.surface_form == "support ticket"
+    assert report.prompt[match.span[0] : match.span[1]] == "support tickte"
+    assert match.correction == "support tickte"
+
+
+def test_a_two_word_form_resolves_when_its_words_are_swapped() -> None:
+    resolver = EntityResolver.from_dict(
+        one_entity("en-GB", "escalation", "support ticket")
+    )
+
+    report = resolver.transform("open a ticket support now", "en-GB")
+    match = report.matches[0]
+
+    assert match.canonical_id == "escalation"
+    assert match.surface_form == "support ticket"
+    assert report.prompt[match.span[0] : match.span[1]] == "ticket support"
+    assert match.correction == "ticket support"
+
+
+def test_a_two_word_form_obeys_the_same_budget_as_a_single_word() -> None:
+    resolver = EntityResolver.from_dict(
+        one_entity("en-GB", "escalation", "support ticket")
+    )
+
+    # Two edits is within the fourteen-character form's budget of two.
+    within = resolver.transform("open a supprt tcket now", "en-GB")
+    assert [match.canonical_id for match in within.matches] == ["escalation"]
+
+    # Three edits is beyond it: no match rather than a wrong one.
+    beyond = resolver.transform("open a supprt tikkat now", "en-GB")
+    assert beyond.matches == ()
+
+
 def test_the_fuzzy_pass_is_isolated_no_similarity_reasoning_leaks_elsewhere() -> None:
     import lexiqr
 

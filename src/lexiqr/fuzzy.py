@@ -87,21 +87,45 @@ def scan(
     covered: tuple[tuple[int, int], ...],
     index: SurfaceFormIndex,
 ) -> tuple[FuzzyHit, ...]:
-    """Near-miss hits over the words the exact scan left uncovered."""
+    """Near-miss hits over the words the exact scan left uncovered.
+
+    Single words are matched against single-word forms; adjacent word pairs are
+    matched against multi-word forms, in the order typed and swapped, so phrase
+    jargon tolerates a misspelled word or two words in the wrong order. Both
+    kinds are emitted; the overlap resolver keeps the longest where a pair and
+    one of its words both matched.
+    """
     forms = _fuzzy_candidates(index.forms())
+    single_forms = tuple(form for form in forms if " " not in form.folded)
+    multi_forms = tuple(form for form in forms if " " in form.folded)
+
+    tokens = _tokens(normalized.text)
     hits: list[FuzzyHit] = []
-    for token, span in _uncovered_tokens(normalized.text, covered):
-        best = _best_candidate(token, forms)
+    for token, span in tokens:
+        if _overlaps_any(span, covered):
+            continue
+        best = _best_candidate(token, single_forms)
         if best is not None:
-            hits.append(
-                FuzzyHit(
-                    canonical_id=best.canonical_id,
-                    surface_form=best.surface_form,
-                    span=span,
-                    score_tier=best.score_tier,
-                )
-            )
+            hits.append(_hit(best, span))
+    for (left, left_span), (right, right_span) in zip(tokens, tokens[1:], strict=False):
+        if _overlaps_any(left_span, covered) or _overlaps_any(right_span, covered):
+            continue
+        span = (left_span[0], right_span[1])
+        best = _best_candidate(f"{left} {right}", multi_forms) or _best_candidate(
+            f"{right} {left}", multi_forms
+        )
+        if best is not None:
+            hits.append(_hit(best, span))
     return tuple(hits)
+
+
+def _hit(form: SurfaceForm, span: tuple[int, int]) -> FuzzyHit:
+    return FuzzyHit(
+        canonical_id=form.canonical_id,
+        surface_form=form.surface_form,
+        span=span,
+        score_tier=form.score_tier,
+    )
 
 
 def _fuzzy_candidates(forms: tuple[SurfaceForm, ...]) -> tuple[SurfaceForm, ...]:
@@ -116,15 +140,17 @@ def _fuzzy_candidates(forms: tuple[SurfaceForm, ...]) -> tuple[SurfaceForm, ...]
     return tuple(form for form in forms if form.score_tier is not ScoreTier.CANONICAL)
 
 
-def _uncovered_tokens(
-    text: str, covered: tuple[tuple[int, int], ...]
-) -> list[tuple[str, tuple[int, int]]]:
-    """The word tokens of `text` that no exact hit already claimed."""
+def _tokens(text: str) -> list[tuple[str, tuple[int, int]]]:
+    """Every word token of `text`, with its span, in order."""
     return [
         (match.group(), (match.start(), match.end()))
         for match in _WORD.finditer(text)
-        if not any(_overlaps((match.start(), match.end()), span) for span in covered)
     ]
+
+
+def _overlaps_any(span: tuple[int, int], covered: tuple[tuple[int, int], ...]) -> bool:
+    """Whether `span` touches any region the exact scan already claimed."""
+    return any(_overlaps(span, region) for region in covered)
 
 
 def _best_candidate(token: str, forms: tuple[SurfaceForm, ...]) -> SurfaceForm | None:
