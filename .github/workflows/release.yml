@@ -1,0 +1,89 @@
+name: Release
+
+# Pushing a v* tag builds the distributions, publishes them to TestPyPI via
+# trusted publishing (no long-lived credentials anywhere — ADR 0004), then
+# proves the release by installing it from TestPyPI and reproducing the flooff
+# match. The flip from TestPyPI to PyPI is a one-line change, made once the
+# pipe is proven.
+#
+# Maintainer prerequisite, once, before the first tag push: register the
+# pending publisher on TestPyPI (project `lexiqr`, owner `bmeunier1974`,
+# repository `lexiqr`, workflow `release.yml`). Without it the publish step is
+# rejected. See CONTRIBUTING.md → Releasing.
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build:
+    name: Build wheel + sdist
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Build the distributions
+        run: uv build
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    name: Publish to TestPyPI
+    needs: build
+    runs-on: ubuntu-latest
+    environment: testpypi
+    permissions:
+      id-token: write # the OIDC token trusted publishing exchanges for an upload token
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Publish via trusted publishing
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+
+  verify:
+    name: Install from TestPyPI and reproduce the flooff match
+    needs: publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install the published package into a clean virtualenv
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          python -m venv /tmp/clean-venv
+          # TestPyPI serves lexiqr; rapidfuzz still comes from the real index.
+          for attempt in 1 2 3 4 5; do
+            if /tmp/clean-venv/bin/pip install \
+                 --index-url https://test.pypi.org/simple/ \
+                 --extra-index-url https://pypi.org/simple/ \
+                 "lexiqr==${version}"; then
+              exit 0
+            fi
+            echo "TestPyPI has not served ${version} yet; retrying in 30s (attempt ${attempt})"
+            sleep 30
+          done
+          echo "lexiqr==${version} never became installable from TestPyPI"
+          exit 1
+
+      - name: Confirm the install pulled in rapidfuzz and nothing else
+        run: /tmp/clean-venv/bin/pip list
+
+      - name: Reproduce the flooff match from the installed package
+        run: /tmp/clean-venv/bin/python scripts/reproduce_flooff.py

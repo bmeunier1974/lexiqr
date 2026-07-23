@@ -47,6 +47,9 @@ uv sync          # creates the venv and installs lexiqr plus its dev tools
 uv run pytest    # the same suite CI runs on every push and pull request
 ```
 
+Release process and the one-time TestPyPI publisher registration live in
+[CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## License
 
 MIT
