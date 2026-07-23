@@ -88,4 +88,4 @@ Status lifecycle: `mapped → planned → epic → shipped`.
 | C15 — `lexiqr try` | cli | [006](docs/plans/006-cli.md) | | planned |
 | C16 — PR CI (lint/type/test matrix) | delivery | [002](docs/plans/002-foundations.md) | | planned |
 | C17 — tag→PyPI trusted publishing | delivery | [008](docs/plans/008-release.md) | | planned |
-| C18 — one-command dev env | delivery | [001](docs/plans/001-walking-skeleton.md) | | planned |
+| C18 — one-command dev env | delivery | [001](docs/plans/001-walking-skeleton.md) | [lexiqr#1](https://github.com/bmeunier1974/lexiqr/issues/1) | epic |
