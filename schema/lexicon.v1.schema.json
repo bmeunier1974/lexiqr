@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/bmeunier1974/lexiqr/v0.0.1/schema/lexicon.v1.schema.json",
+  "title": "lexiqr lexicon v1",
+  "description": "A tenant's multilingual mapping from company jargon to canonical entities.",
+  "type": "object",
+  "required": ["schemaVersion", "defaultLocale", "entities"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "description": "Optional pointer to this schema, so editors offer completion and inline validation.",
+      "type": "string"
+    },
+    "schemaVersion": {
+      "description": "The lexicon file format version this document declares.",
+      "const": "1"
+    },
+    "defaultLocale": {
+      "description": "BCP 47 tag used when resolution finds no better locale match.",
+      "$ref": "#/$defs/locale"
+    },
+    "entities": {
+      "description": "Entities keyed by canonical ID (e.g. \"product\").",
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": { "$ref": "#/$defs/canonicalId" },
+      "additionalProperties": { "$ref": "#/$defs/entity" }
+    }
+  },
+  "$defs": {
+    "locale": {
+      "type": "string",
+      "pattern": "^[A-Za-z]{2,3}(-[A-Za-z]{4})?(-([A-Za-z]{2}|[0-9]{3}))?$"
+    },
+    "canonicalId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_.-]+$"
+    },
+    "entity": {
+      "type": "object",
+      "required": ["locales"],
+      "additionalProperties": false,
+      "properties": {
+        "locales": {
+          "description": "Surface forms per locale.",
+          "type": "object",
+          "minProperties": 1,
+          "propertyNames": { "$ref": "#/$defs/locale" },
+          "additionalProperties": { "$ref": "#/$defs/surfaceForms" }
+        }
+      }
+    },
+    "surfaceForms": {
+      "type": "object",
+      "required": ["preferred"],
+      "additionalProperties": false,
+      "properties": {
+        "preferred": {
+          "description": "The surface form the tenant considers canonical in this locale.",
+          "type": "object",
+          "required": ["singular"],
+          "additionalProperties": false,
+          "properties": {
+            "singular": { "$ref": "#/$defs/surfaceForm" },
+            "plural": { "$ref": "#/$defs/surfaceForm" }
+          }
+        },
+        "alternates": {
+          "description": "Other labels users type for this entity in this locale.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/surfaceForm" },
+          "uniqueItems": true
+        }
+      }
+    },
+    "surfaceForm": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}
