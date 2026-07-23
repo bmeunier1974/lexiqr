@@ -22,14 +22,20 @@ from lexiqr.overlaps import Candidate, resolve
 from lexiqr.types import EntityMatch
 
 
-def scan(prompt: str, lexicon: Lexicon, locale: str) -> tuple[EntityMatch, ...]:
-    """Resolve `prompt`, read in `locale`: exact scan, then fuzzy over the rest."""
+def scan(
+    prompt: str, lexicon: Lexicon, locale: str, *, fuzzy_enabled: bool = True
+) -> tuple[EntityMatch, ...]:
+    """Resolve `prompt`, read in `locale`: exact scan, then fuzzy over the rest.
+
+    With `fuzzy_enabled` off the second pass is skipped outright, not run and
+    filtered — exact-only mode does no fuzzy work at all.
+    """
     normalized = normalize(prompt, locale)
     index = SurfaceFormIndex.build(lexicon, locale)
 
     exact = index.scan(normalized.text)
     covered = tuple(hit.span for hit in exact)
-    fuzzy_hits = fuzzy.scan(normalized, covered, index)
+    fuzzy_hits = fuzzy.scan(normalized, covered, index) if fuzzy_enabled else ()
 
     candidates = tuple(
         Candidate(

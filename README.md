@@ -14,7 +14,13 @@ from lexiqr import EntityResolver
 resolver = EntityResolver.from_file("lexicon.json")
 report = resolver.transform("wo ist flooff", locale="de-DE")
 # → one match: entity "product", surface "flooff", span (7, 13), tier "preferred"
+
+# Typo tolerance is on by default: "floof" still resolves, and the match carries
+# a correction naming what was typed. Pass fuzzy=False for exact-only behaviour.
+exact_only = EntityResolver.from_file("lexicon.json", fuzzy=False)
 ```
+
+The `fuzzy` keyword — accepted by `EntityResolver(...)`, `from_file`, and `from_dict`, defaulting to `True` — is public, semver-governed API.
 
 > **Status:** pre-1.0 — under active development. The API above is the target contract.
 

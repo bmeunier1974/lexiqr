@@ -7,10 +7,12 @@ the order candidates were generated in; those are the fuzzy pass's private
 business and are free to change.
 """
 
+import json
 from pathlib import Path
 from typing import Any
 
 from lexiqr import EntityResolver, ScoreTier
+from lexiqr.lexicon import Lexicon
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 FLOOFF = REPO_ROOT / "examples" / "flooff.lexicon.json"
@@ -136,6 +138,42 @@ def test_a_candidate_within_budget_but_below_similarity_does_not_resolve() -> No
     # "flooaa" is two edits from "flooff" — inside the six-character budget — but
     # too dissimilar to stand behind, so the threshold turns it away.
     assert not resolves("de-DE", "product", "flooff", "wo ist flooaa")
+
+
+def test_fuzzy_is_on_by_default_so_a_typo_resolves_without_configuration() -> None:
+    report = EntityResolver.from_file(FLOOFF).transform("wo ist floof", "de-DE")
+
+    assert report.matches[0].correction == "floof"
+
+
+def test_fuzzy_false_turns_off_tolerance_but_keeps_exact_matching() -> None:
+    resolver = EntityResolver.from_file(FLOOFF, fuzzy=False)
+
+    assert resolver.transform("wo ist floof", "de-DE").matches == ()
+    exact = resolver.transform("wo ist flooff", "de-DE")
+    assert [match.canonical_id for match in exact.matches] == ["product"]
+
+
+def test_fuzzy_false_produces_no_correction_anywhere() -> None:
+    resolver = EntityResolver.from_file(FLOOFF, fuzzy=False)
+
+    report = resolver.transform("wo ist flooff und floof", "de-DE")
+
+    assert report.matches  # the correctly spelled term still resolves
+    assert all(match.correction is None for match in report.matches)
+
+
+def test_the_fuzzy_keyword_is_accepted_on_every_construction_path() -> None:
+    document = json.loads(FLOOFF.read_text(encoding="utf-8"))
+
+    resolvers = (
+        EntityResolver.from_file(FLOOFF, fuzzy=False),
+        EntityResolver.from_dict(document, fuzzy=False),
+        EntityResolver(Lexicon.from_dict(document), fuzzy=False),
+    )
+
+    for resolver in resolvers:
+        assert resolver.transform("wo ist floof", "de-DE").matches == ()
 
 
 def test_the_fuzzy_pass_is_isolated_no_similarity_reasoning_leaks_elsewhere() -> None:
