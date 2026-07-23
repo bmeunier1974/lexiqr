@@ -1,0 +1,41 @@
+{
+  "$schema": "https://raw.githubusercontent.com/bmeunier1974/lexiqr/v0.0.1/schema/lexicon.v1.schema.json",
+  "schemaVersion": "1",
+  "defaultLocale": "de-DE",
+  "entities": {
+    "product": {
+      "locales": {
+        "de-DE": {
+          "preferred": { "singular": "flooff", "plural": "flooffs" },
+          "alternates": ["artikel", "ware"]
+        },
+        "en-GB": {
+          "preferred": { "singular": "widget", "plural": "widgets" },
+          "alternates": ["item"]
+        },
+        "ar-EG": {
+          "preferred": { "singular": "منتج", "plural": "منتجات" },
+          "alternates": ["سلعة"]
+        }
+      }
+    },
+    "invoice": {
+      "locales": {
+        "de-DE": {
+          "preferred": { "singular": "rechnung", "plural": "rechnungen" }
+        },
+        "en-GB": {
+          "preferred": { "singular": "invoice", "plural": "invoices" },
+          "alternates": ["bill"]
+        }
+      }
+    },
+    "support-ticket": {
+      "locales": {
+        "en-GB": {
+          "preferred": { "singular": "ticket" }
+        }
+      }
+    }
+  }
+}

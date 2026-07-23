@@ -15,6 +15,7 @@ from jsonschema.exceptions import ValidationError
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SCHEMA_PATH = REPO_ROOT / "schema" / "lexicon.v1.schema.json"
 FIXTURE_PATH = REPO_ROOT / "examples" / "flooff.lexicon.json"
+VALID_CORPUS = REPO_ROOT / "schema" / "fixtures" / "valid"
 
 
 def load(path: Path) -> Any:
@@ -30,6 +31,16 @@ def test_flooff_fixture_lexicon_passes_the_published_schema(
     validator: Draft202012Validator,
 ) -> None:
     validator.validate(load(FIXTURE_PATH))
+
+
+def test_every_valid_corpus_fixture_passes_the_published_schema(
+    validator: Draft202012Validator,
+) -> None:
+    fixtures = sorted(VALID_CORPUS.glob("*.lexicon.json"))
+
+    assert fixtures, f"no valid fixtures found in {VALID_CORPUS}"
+    for fixture in fixtures:
+        validator.validate(load(fixture))
 
 
 def test_flooff_fixture_maps_the_surface_form_flooff_to_canonical_id_product() -> None:
