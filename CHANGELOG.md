@@ -42,3 +42,7 @@ down under a new `## [x.y.z]` heading dated on the day it ships.
   illustrative multi-tenant tenant→resolver recipe (marked non-executable).
 - Quickstart extractor: a `<!-- quickstart:skip -->` directive to mark a block
   explicitly illustrative so it is never collected as a runnable unit.
+- Written release checklist (`RELEASING.md`), linked from CONTRIBUTING: the whole
+  path from "ready to release" to "published and verified", marking each step as
+  CI-enforced or a human judgment (heritage prerequisite, recipe review,
+  one-time trusted-publisher setup, tag-push steps).

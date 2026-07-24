@@ -34,6 +34,9 @@ uv run lexiqr try examples/flooff.lexicon.json --locale de-DE "wo ist flooff"
 
 ## Releasing
 
+The full step-by-step checklist — including the human judgments CI cannot make —
+lives in [RELEASING.md](RELEASING.md). The summary:
+
 Releases are cut by pushing a semver tag; `.github/workflows/release.yml` builds
 the wheel and sdist, publishes them, then installs the published package into a
 clean virtualenv and reproduces the flooff match. A release that cannot be
