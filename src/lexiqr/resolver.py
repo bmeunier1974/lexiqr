@@ -63,7 +63,10 @@ class EntityResolver:
         chain matches, the report's resolved locale is the requested one and its
         match list is empty, an ordinary result rather than an error.
         """
-        for chain_locale in fallback.build_chain(locale, self._available):
+        chain = fallback.build_chain(
+            locale, self._available, self._lexicon.default_locale
+        )
+        for chain_locale in chain:
             matches = scan(
                 prompt,
                 self._indexes[chain_locale.casefold()],

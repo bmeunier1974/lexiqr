@@ -20,14 +20,20 @@ from __future__ import annotations
 from collections.abc import Iterable
 
 
-def build_chain(requested: str, available: Iterable[str]) -> tuple[str, ...]:
+def build_chain(
+    requested: str, available: Iterable[str], default_locale: str
+) -> tuple[str, ...]:
     """The locales to try for `requested`, best first, filtered to `available`.
 
-    `available` is the set of locales the lexicon declares. The chain is the
-    exact requested locale (only if the lexicon has it), then its same-language
-    siblings in a deterministic order, deduplicated. A request whose language
-    the lexicon never declares yields an empty chain — the caller reads that as
-    "no locale to try", an ordinary outcome rather than an error.
+    `available` is the set of locales the lexicon declares and `default_locale`
+    its declared default. The chain is the exact requested locale (only if the
+    lexicon has it), then its same-language siblings in a deterministic order,
+    then the declared default as a final backstop — deduplicated, so a locale
+    already earlier in the chain (the default is often the requested locale
+    itself) is never walked twice. A default the lexicon does not actually
+    author is dropped, as any absent locale is; a request whose language has no
+    variant and whose default is unauthored yields an empty chain — the caller
+    reads that as "no locale to try", an ordinary outcome rather than an error.
 
     Tags in the returned chain carry the lexicon's own spelling, so a caller can
     report which locale answered in the casing the lexicon author wrote.
@@ -42,15 +48,16 @@ def build_chain(requested: str, available: Iterable[str]) -> tuple[str, ...]:
     chain: list[str] = []
     seen: set[str] = set()
 
-    exact = by_fold.get(requested.casefold())
-    if exact is not None:
-        seen.add(exact.casefold())
-        chain.append(exact)
+    def append(locale: str | None) -> None:
+        if locale is not None and locale.casefold() not in seen:
+            seen.add(locale.casefold())
+            chain.append(locale)
 
+    append(by_fold.get(requested.casefold()))
     for sibling in sorted(by_fold.values(), key=str.casefold):
-        if _language_subtag(sibling) == language and sibling.casefold() not in seen:
-            seen.add(sibling.casefold())
-            chain.append(sibling)
+        if _language_subtag(sibling) == language:
+            append(sibling)
+    append(by_fold.get(default_locale.casefold()))
 
     return tuple(chain)
 
