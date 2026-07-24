@@ -84,8 +84,8 @@ Status lifecycle: `mapped → planned → epic → shipped`.
 | C11 — CI-enforced perf envelope | core, delivery | [007](docs/plans/007-hardening.md) | [lexiqr#7](https://github.com/bmeunier1974/lexiqr/issues/7) | epic |
 | C12 — README quickstart (flooff) | core, delivery | [008](docs/plans/008-release.md) | [lexiqr#8](https://github.com/bmeunier1974/lexiqr/issues/8) | epic |
 | C13 — published JSON Schema | schema | [002](docs/plans/002-foundations.md) | [lexiqr#2](https://github.com/bmeunier1974/lexiqr/issues/2) | shipped |
-| C14 — `lexiqr validate` | cli | [006](docs/plans/006-cli.md) | [lexiqr#6](https://github.com/bmeunier1974/lexiqr/issues/6) | epic |
-| C15 — `lexiqr try` | cli | [006](docs/plans/006-cli.md) | [lexiqr#6](https://github.com/bmeunier1974/lexiqr/issues/6) | epic |
+| C14 — `lexiqr validate` | cli | [006](docs/plans/006-cli.md) | [lexiqr#6](https://github.com/bmeunier1974/lexiqr/issues/6) | shipped |
+| C15 — `lexiqr try` | cli | [006](docs/plans/006-cli.md) | [lexiqr#6](https://github.com/bmeunier1974/lexiqr/issues/6) | shipped |
 | C16 — PR CI (lint/type/test matrix) | delivery | [002](docs/plans/002-foundations.md) | [lexiqr#2](https://github.com/bmeunier1974/lexiqr/issues/2) | shipped |
 | C17 — tag→PyPI trusted publishing | delivery | [008](docs/plans/008-release.md) | [lexiqr#8](https://github.com/bmeunier1974/lexiqr/issues/8) | epic |
 | C18 — one-command dev env | delivery | [001](docs/plans/001-walking-skeleton.md) | [lexiqr#1](https://github.com/bmeunier1974/lexiqr/issues/1) | shipped |
