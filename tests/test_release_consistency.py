@@ -178,14 +178,15 @@ _SCRIPT = Path(__file__).resolve().parent.parent / "scripts" / "release_consiste
 
 
 def test_script_reports_a_version_mismatch_against_the_real_repo() -> None:
-    # The package declares 0.0.1; a v2.0.0 tag disagrees, and the script — which
-    # reads pyproject and CHANGELOG itself — must say so and exit non-zero.
+    # An impossible tag disagrees with whatever the package actually declares, and
+    # the script — which reads pyproject and CHANGELOG itself — must say so and
+    # exit non-zero. Kept version-independent so it survives release bumps.
     result = subprocess.run(
-        [sys.executable, str(_SCRIPT), "v2.0.0"],
+        [sys.executable, str(_SCRIPT), "v99.99.99"],
         capture_output=True,
         text=True,
     )
 
     assert result.returncode == 1
-    assert "2.0.0" in result.stdout
-    assert "0.0.1" in result.stdout
+    assert "99.99.99" in result.stdout
+    assert "mismatch" in result.stdout.lower()

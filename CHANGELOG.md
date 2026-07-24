@@ -16,41 +16,49 @@ down under a new `## [x.y.z]` heading dated on the day it ships.
 
 ## [Unreleased]
 
+_Nothing yet._
+
+## [1.0.0] - 2026-07-24
+
+The initial public release of lexiqr: deterministic, tenant-scoped resolution of
+company jargon to canonical entities, on PyPI.
+
 ### Added
 
-- Release-consistency gate: a pure checker (`scripts/release_consistency.py`)
-  that refuses a version tag unless the tag, the package's declared version, and
-  this changelog's top entry agree, with a message naming which of the three
-  disagreed. Runs as the first job on a `v*` tag, before build and publish.
-- This changelog, in Keep-a-Changelog format.
-- Quickstart extractor (`scripts/quickstart_extractor.py`): a pure module that
-  pulls the explicitly-marked runnable snippets out of the README so the
-  quickstart can be executed as a test.
-- The built wheel now bundles the versioned JSON Schema
-  (`lexiqr/schema/lexicon.v1.schema.json`) alongside the type marker, and a
-  build-time test asserts the wheel's contents (schema, `py.typed`, console
-  entry point) and release-quality metadata.
-- Package metadata: an issue-tracker link and a changelog link on the PyPI page.
-- Heritage / provenance note (`HERITAGE.md`) recording the clean-room position,
-  alongside a `LICENSE` file, referenced from the README.
-- Executable README quickstart: the founding flooff story for both actors runs
-  in CI (`tests/test_readme_quickstart.py`) against the README's own inline
-  lexicon, so the front page cannot drift from the shipped API.
-- Release documentation on the README: the semver-governed surface named
-  explicitly (public API, error types, report types, canonical serialization),
-  supported Python versions, a CHANGELOG link, a CI status badge, and an
-  illustrative multi-tenant tenant→resolver recipe (marked non-executable).
-- Quickstart extractor: a `<!-- quickstart:skip -->` directive to mark a block
-  explicitly illustrative so it is never collected as a runnable unit.
-- Written release checklist (`RELEASING.md`), linked from CONTRIBUTING: the whole
-  path from "ready to release" to "published and verified", marking each step as
-  CI-enforced or a human judgment (heritage prerequisite, recipe review,
-  one-time trusted-publisher setup, tag-push steps).
+- **Deterministic resolution engine.** `EntityResolver` transforms free-form
+  prompts into entity-identified match reports — exact and typo-tolerant matches
+  with character spans, score tiers, and corrections — reproducibly within and
+  across processes and platforms.
+- **Typo tolerance** on by default (`fuzzy=True`); every fuzzy match carries a
+  correction naming what was typed. `fuzzy=False` gives exact-only behaviour.
+- **Multilingual, locale-aware lexicons** with locale fallback, so a prompt read
+  in one locale can resolve through its declared fallbacks.
+- **Structured errors.** `ValidationError` carries the coordinates (canonical
+  id, locale, field) that make a rejected lexicon actionable without debugging
+  lexiqr.
+- **Canonical report serialization** — `serialize_report` / `deserialize_report`
+  produce a byte-stable form that round-trips and only changes on a major
+  release, so a stored snapshot stays comparable.
+- **Bounded, guarded input** — a fixed 10,000-character prompt limit enforced
+  before matching, and adversarial Unicode handled in bounded time.
+- **`lexiqr` CLI** for lexicon authors — `validate` and `try` — with a
+  scriptable exit-code contract.
+- **Typed and self-contained** — ships `py.typed` and the versioned JSON Schema
+  inside a pure-Python wheel, with rapidfuzz as the sole runtime dependency.
+- **Stated, CI-enforced performance envelope** — `transform()` p95 < 10 ms and
+  cold initialization < 1 s against the seeded 1,000-surface-form benchmark.
+- **Executable README quickstart** — the founding flooff story for both the
+  developer and the lexicon author, run in CI against the README's own inline
+  lexicon so the front page cannot drift from the shipped API.
+- **Semver-governed surface named explicitly** — the public API, the structured
+  error types, the match report types, and the canonical serialization.
 
-### Changed
+### Release infrastructure
 
-- The release workflow now publishes to **real PyPI** via trusted publishing
-  (was TestPyPI), fails cleanly if the version already exists, and its
-  post-publish job installs from PyPI into a clean virtualenv — tolerating index
-  propagation delay — to reproduce the flooff match and confirm the `lexiqr`
-  console entry point is callable.
+- Trusted-publishing release workflow to real PyPI (OIDC, no long-lived token),
+  gated by a release-consistency check — the tag, the package version, and the
+  top changelog entry must agree — that runs before build, with a post-publish
+  job that installs from PyPI into a clean virtualenv and reproduces the flooff
+  match (C1).
+- `CHANGELOG.md` (Keep a Changelog), the `HERITAGE.md` clean-room provenance note
+  beside the MIT `LICENSE`, and the `RELEASING.md` checklist.

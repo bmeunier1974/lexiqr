@@ -1,6 +1,6 @@
 [project]
 name = "lexiqr"
-version = "0.0.1"
+version = "1.0.0"
 description = "Deterministic, tenant-scoped resolution of company jargon to canonical entities."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -8,7 +8,7 @@ license = { text = "MIT" }
 authors = [{ name = "Benoit Meunier" }]
 keywords = ["nlp", "entity-resolution", "lexicon", "fuzzy-matching", "i18n"]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
