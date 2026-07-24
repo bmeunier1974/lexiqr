@@ -72,20 +72,20 @@ Status lifecycle: `mapped → planned → epic → shipped`.
 | Capability | Container(s) | Plan | Epic | Status |
 |------------|--------------|------|------|--------|
 | C1 — pip install from PyPI | delivery | [008](docs/plans/008-release.md) | [lexiqr#8](https://github.com/bmeunier1974/lexiqr/issues/8) | epic |
-| C2 — init from lexicon data | core | [002](docs/plans/002-foundations.md) | [lexiqr#2](https://github.com/bmeunier1974/lexiqr/issues/2) | epic |
-| C3 — precise validation errors | core | [002](docs/plans/002-foundations.md) | [lexiqr#2](https://github.com/bmeunier1974/lexiqr/issues/2) | epic |
-| C4 — transform() match report | core | [003](docs/plans/003-exact-matching.md) | [lexiqr#3](https://github.com/bmeunier1974/lexiqr/issues/3) | epic |
+| C2 — init from lexicon data | core | [002](docs/plans/002-foundations.md) | [lexiqr#2](https://github.com/bmeunier1974/lexiqr/issues/2) | shipped |
+| C3 — precise validation errors | core | [002](docs/plans/002-foundations.md) | [lexiqr#2](https://github.com/bmeunier1974/lexiqr/issues/2) | shipped |
+| C4 — transform() match report | core | [003](docs/plans/003-exact-matching.md) | [lexiqr#3](https://github.com/bmeunier1974/lexiqr/issues/3) | shipped |
 | C5 — typo-tolerant matching | core | [004](docs/plans/004-fuzzy-matching.md) | [lexiqr#4](https://github.com/bmeunier1974/lexiqr/issues/4) | shipped |
 | C6 — locale fallback chain | core | [005](docs/plans/005-locale-fallback.md) | [lexiqr#5](https://github.com/bmeunier1974/lexiqr/issues/5) | epic |
-| C7 — accent/script handling | core | [003](docs/plans/003-exact-matching.md) | [lexiqr#3](https://github.com/bmeunier1974/lexiqr/issues/3) | epic |
+| C7 — accent/script handling | core | [003](docs/plans/003-exact-matching.md) | [lexiqr#3](https://github.com/bmeunier1974/lexiqr/issues/3) | shipped |
 | C8 — bounded adversarial input | core | [007](docs/plans/007-hardening.md) | [lexiqr#7](https://github.com/bmeunier1974/lexiqr/issues/7) | epic |
 | C9 — determinism guarantee | core, delivery | [007](docs/plans/007-hardening.md) | [lexiqr#7](https://github.com/bmeunier1974/lexiqr/issues/7) | epic |
-| C10 — py.typed / strict typing | core, delivery | [002](docs/plans/002-foundations.md) | [lexiqr#2](https://github.com/bmeunier1974/lexiqr/issues/2) | epic |
+| C10 — py.typed / strict typing | core, delivery | [002](docs/plans/002-foundations.md) | [lexiqr#2](https://github.com/bmeunier1974/lexiqr/issues/2) | shipped |
 | C11 — CI-enforced perf envelope | core, delivery | [007](docs/plans/007-hardening.md) | [lexiqr#7](https://github.com/bmeunier1974/lexiqr/issues/7) | epic |
 | C12 — README quickstart (flooff) | core, delivery | [008](docs/plans/008-release.md) | [lexiqr#8](https://github.com/bmeunier1974/lexiqr/issues/8) | epic |
-| C13 — published JSON Schema | schema | [002](docs/plans/002-foundations.md) | [lexiqr#2](https://github.com/bmeunier1974/lexiqr/issues/2) | epic |
+| C13 — published JSON Schema | schema | [002](docs/plans/002-foundations.md) | [lexiqr#2](https://github.com/bmeunier1974/lexiqr/issues/2) | shipped |
 | C14 — `lexiqr validate` | cli | [006](docs/plans/006-cli.md) | [lexiqr#6](https://github.com/bmeunier1974/lexiqr/issues/6) | epic |
 | C15 — `lexiqr try` | cli | [006](docs/plans/006-cli.md) | [lexiqr#6](https://github.com/bmeunier1974/lexiqr/issues/6) | epic |
-| C16 — PR CI (lint/type/test matrix) | delivery | [002](docs/plans/002-foundations.md) | [lexiqr#2](https://github.com/bmeunier1974/lexiqr/issues/2) | epic |
+| C16 — PR CI (lint/type/test matrix) | delivery | [002](docs/plans/002-foundations.md) | [lexiqr#2](https://github.com/bmeunier1974/lexiqr/issues/2) | shipped |
 | C17 — tag→PyPI trusted publishing | delivery | [008](docs/plans/008-release.md) | [lexiqr#8](https://github.com/bmeunier1974/lexiqr/issues/8) | epic |
-| C18 — one-command dev env | delivery | [001](docs/plans/001-walking-skeleton.md) | [lexiqr#1](https://github.com/bmeunier1974/lexiqr/issues/1) | epic |
+| C18 — one-command dev env | delivery | [001](docs/plans/001-walking-skeleton.md) | [lexiqr#1](https://github.com/bmeunier1974/lexiqr/issues/1) | shipped |
