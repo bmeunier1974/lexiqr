@@ -24,6 +24,12 @@ The `fuzzy` keyword — accepted by `EntityResolver(...)`, `from_file`, and `fro
 
 > **Status:** pre-1.0 — under active development. The API above is the target contract.
 
+## Input limits
+
+`transform()` accepts a prompt of at most **10,000 characters** (Unicode code points). A prompt over that limit raises `ValidationError` — the same structured error every other lexiqr failure raises — before any matching work happens, so a pasted document is rejected cheaply rather than taking a request thread with it. Reject or truncate upstream if your callers can paste arbitrary text.
+
+This limit is a fixed part of the contract, not a per-call argument or a configuration knob: one number to reason about. Changing it is a semver-visible change.
+
 ## This repository
 
 This is a single-repo project: it is both the meta-repo (vision and blueprint) and the product repo (all four C4 containers ship from here as one wheel).

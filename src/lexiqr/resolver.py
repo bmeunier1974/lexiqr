@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from lexiqr import fallback
+from lexiqr.guard import check_prompt
 from lexiqr.index import SurfaceFormIndex
 from lexiqr.lexicon import Lexicon
 from lexiqr.matcher import scan
@@ -97,7 +98,13 @@ class EntityResolver:
         report names it. When no locale in the chain matches, the report's
         resolved locale is the requested one and its match list is empty, an
         ordinary result rather than an error.
+
+        Before any of that, the input guard is consulted once: a prompt that
+        exceeds the documented maximum length is rejected here with a
+        `ValidationError`, ahead of normalization and matching, so hostile input
+        costs a rejection rather than a full pipeline pass.
         """
+        prompt = check_prompt(prompt)
         chain = (
             self._explicit_chain
             if self._explicit_chain is not None
