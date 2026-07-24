@@ -38,6 +38,11 @@ EXIT_INVALID_LEXICON = 1
 #: file is not valid JSON. Distinct from ``EXIT_INVALID_LEXICON`` so a script
 #: can tell a broken path from a broken lexicon.
 EXIT_CLI_ERROR = 3
+#: `try` ran against a valid lexicon but the report was empty. Distinct from
+#: every load-failure code so a regression script can tell "the prompt did not
+#: resolve" from "the lexicon could not be loaded". (Exit code 2 is left to
+#: argparse for its own usage errors.)
+EXIT_NO_MATCH = 4
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -76,7 +81,7 @@ def _try(args: argparse.Namespace) -> int:
 
     report = resolver.transform(args.prompt, args.locale)
     print(render_match_report(report))
-    return EXIT_OK
+    return EXIT_OK if report.matches else EXIT_NO_MATCH
 
 
 def _load_document(source: str) -> tuple[Any | None, int]:
