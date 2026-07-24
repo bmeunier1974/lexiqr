@@ -46,3 +46,11 @@ down under a new `## [x.y.z]` heading dated on the day it ships.
   path from "ready to release" to "published and verified", marking each step as
   CI-enforced or a human judgment (heritage prerequisite, recipe review,
   one-time trusted-publisher setup, tag-push steps).
+
+### Changed
+
+- The release workflow now publishes to **real PyPI** via trusted publishing
+  (was TestPyPI), fails cleanly if the version already exists, and its
+  post-publish job installs from PyPI into a clean virtualenv — tolerating index
+  propagation delay — to reproduce the flooff match and confirm the `lexiqr`
+  console entry point is callable.
