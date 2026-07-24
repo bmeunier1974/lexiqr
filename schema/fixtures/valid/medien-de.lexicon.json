@@ -1,0 +1,25 @@
+{
+  "$schema": "https://raw.githubusercontent.com/bmeunier1974/lexiqr/v0.0.1/schema/lexicon.v1.schema.json",
+  "schemaVersion": "1",
+  "defaultLocale": "de-DE",
+  "entities": {
+    "product": {
+      "locales": {
+        "de-DE": {
+          "preferred": { "singular": "flooff", "plural": "flooffs" },
+          "alternates": ["artikel", "ware"]
+        }
+      }
+    },
+    "invoice": {
+      "locales": {
+        "de-DE": {
+          "preferred": { "singular": "rechnung", "plural": "rechnungen" }
+        },
+        "de-AT": {
+          "preferred": { "singular": "rechnung", "plural": "rechnungen" }
+        }
+      }
+    }
+  }
+}
