@@ -17,8 +17,27 @@ on:
       - "v*"
 
 jobs:
+  consistency:
+    # The gate runs first and alone: the tag, the package's declared version,
+    # and the changelog's top entry must agree, and that entry must be
+    # non-empty. A mismatch fails here — in seconds, before a wheel is built or a
+    # version number is burned — with a message naming which of the three
+    # disagreed. Pure stdlib, no build step; see scripts/release_consistency.py.
+    name: Release-consistency gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Check tag / version / changelog agree
+        run: python scripts/release_consistency.py "${GITHUB_REF_NAME}"
+
   build:
     name: Build wheel + sdist
+    needs: consistency
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
