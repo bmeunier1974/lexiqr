@@ -91,9 +91,10 @@ def test_a_declared_default_absent_from_the_lexicon_is_dropped() -> None:
 
 
 def test_an_explicit_chain_keeps_only_present_locales_in_the_order_given() -> None:
-    assert resolve_explicit_chain(
-        ["en-GB", "de-DE"], ["de-DE", "de-AT", "en-GB"]
-    ) == ("en-GB", "de-DE")
+    assert resolve_explicit_chain(["en-GB", "de-DE"], ["de-DE", "de-AT", "en-GB"]) == (
+        "en-GB",
+        "de-DE",
+    )
 
 
 def test_an_explicit_chain_drops_locales_absent_from_the_lexicon() -> None:
@@ -105,9 +106,10 @@ def test_an_explicit_chain_matches_the_lexicon_case_insensitively() -> None:
 
 
 def test_an_explicit_chain_deduplicates_keeping_the_first_position() -> None:
-    assert resolve_explicit_chain(
-        ["de-DE", "de-AT", "de-DE"], ["de-DE", "de-AT"]
-    ) == ("de-DE", "de-AT")
+    assert resolve_explicit_chain(["de-DE", "de-AT", "de-DE"], ["de-DE", "de-AT"]) == (
+        "de-DE",
+        "de-AT",
+    )
 
 
 def test_an_empty_explicit_chain_is_rejected() -> None:
