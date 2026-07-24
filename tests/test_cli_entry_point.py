@@ -48,15 +48,24 @@ def test_lexiqr_try_prints_the_match_report_and_exits_zero() -> None:
 
 
 def test_the_cli_reaches_only_for_lexiqrs_public_api() -> None:
-    """ADR 0002: the cli↔core boundary is the public API, checked by construction."""
-    source = (
-        Path(__file__).resolve().parent.parent / "src" / "lexiqr" / "cli.py"
-    ).read_text(encoding="utf-8")
+    """ADR 0002: the cli↔core boundary is the public API, checked by construction.
 
-    private_imports = [
-        line
-        for line in source.splitlines()
-        if line.startswith(("from lexiqr.", "import lexiqr."))
-    ]
+    Every reference into lexiqr from any CLI module must resolve either to the
+    package root (`from lexiqr import ...`, the public API) or to a sibling
+    module inside the `lexiqr.cli` package itself. A reach into a private core
+    submodule (`from lexiqr.matcher import ...`) fails here, not at review time.
+    """
+    cli_package = Path(__file__).resolve().parent.parent / "src" / "lexiqr" / "cli"
+
+    private_imports: list[str] = []
+    for module in sorted(cli_package.rglob("*.py")):
+        for line in module.read_text(encoding="utf-8").splitlines():
+            stripped = line.strip()
+            if not stripped.startswith(("from lexiqr.", "import lexiqr.")):
+                continue
+            target = stripped.split()[1]
+            if target == "lexiqr.cli" or target.startswith("lexiqr.cli."):
+                continue
+            private_imports.append(f"{module.name}: {stripped}")
 
     assert private_imports == []
