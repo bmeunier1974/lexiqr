@@ -101,6 +101,17 @@ class SurfaceFormIndex:
                 # An entity whose canonical ID reads the same as one of its
                 # labels ("invoice") declared one form, not two candidates at
                 # different tiers. Best tier first means the first wins.
+                #
+                # The same rule settles a genuine tie determinism depends on: one
+                # entity declaring two forms that fold to the same text ("café"
+                # and "cafe" both fold to "cafe"). They would claim the identical
+                # span at the identical tier, and nothing about the text or the
+                # entity separates them — so the ordering closes here, on
+                # declaration order, keeping the first-declared and never
+                # emitting a second candidate that a later stage would have to
+                # break by whichever it happened to see first. Declaration order
+                # is stable across runs, machines, and hash seeds; this is a
+                # deliberate, deterministic behavior decision, not incidental.
                 if folded and folded not in seen:
                     seen.add(folded)
                     _insert(root, folded, canonical_id, surface_form, tier)

@@ -15,11 +15,15 @@ emit first. This is that one rule, owning precedence for both kinds:
 2. **Then the better tier wins.** Their own vocabulary beats a synonym, and a
    synonym beats the identifier they never see.
 3. **Then the earlier start wins.**
-4. **Then the lower canonical ID wins.** Two entities can declare the same
-   surface form, which leaves nothing about the *text* to choose between them.
-   Something still has to be picked, and picked the same way on every machine.
+4. **Then the lower canonical ID wins.** Two *different* entities can declare
+   surface forms that fold to the same text — "cafe" and "café" both fold to
+   "cafe" — and claim the same span at the same tier, which leaves nothing about
+   the text to choose between them. Something still has to be picked, and picked
+   the same way on every machine.
 
-Rule 4 is arbitrary in the way a tiebreak has to be. Rules 0–3 are not.
+Rule 4 is arbitrary in the way a tiebreak has to be. Rules 0–3 are not. (Two
+forms of the *same* entity that fold alike never reach here: the index keeps the
+first-declared one, so only one candidate is ever emitted for them.)
 """
 
 from __future__ import annotations
