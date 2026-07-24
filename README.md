@@ -30,6 +30,19 @@ The `fuzzy` keyword — accepted by `EntityResolver(...)`, `from_file`, and `fro
 
 This limit is a fixed part of the contract, not a per-call argument or a configuration knob: one number to reason about. Changing it is a semver-visible change.
 
+## Canonical report serialization
+
+`serialize_report(report)` turns a `MatchReport` into a **canonical** string — sorted keys, no insignificant whitespace, pure ASCII, and the match list in the report's own order. Two byte-equal serializations mean two equal reports and nothing else, so you can snapshot a result in your test suite, diff two snapshots to see real behaviour change, or store one and compare it to another months later. `deserialize_report(text)` is its inverse: the form round-trips.
+
+```python
+from lexiqr import serialize_report, deserialize_report
+
+snapshot = serialize_report(resolver.transform("wo ist flooff", locale="de-DE"))
+# ... store `snapshot`, compare it later, or check it into your tests
+```
+
+Both functions are public, semver-governed API: the serialized shape can only change on a major release, so a patch or minor upgrade never silently invalidates a stored snapshot.
+
 ## This repository
 
 This is a single-repo project: it is both the meta-repo (vision and blueprint) and the product repo (all four C4 containers ship from here as one wheel).
