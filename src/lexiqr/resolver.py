@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
@@ -19,7 +20,13 @@ class EntityResolver:
     the host application's job.
     """
 
-    def __init__(self, lexicon: Lexicon, *, fuzzy: bool = True) -> None:
+    def __init__(
+        self,
+        lexicon: Lexicon,
+        *,
+        fuzzy: bool = True,
+        fallback_chain: Iterable[str] | None = None,
+    ) -> None:
         """Hold one tenant's lexicon and compile its per-locale scan indexes.
 
         Every locale the lexicon declares is compiled into a surface-form index
@@ -32,6 +39,14 @@ class EntityResolver:
         tolerance works without configuration; passing `fuzzy=False` returns the
         resolver to exact-only behavior, skipping the fuzzy pass entirely rather
         than running and filtering it — exact-only mode is also the fast mode.
+
+        `fallback_chain` is an optional explicit locale chain that fully replaces
+        the default policy: only the locales named here (and present in the
+        lexicon), in this order, are walked. It is resolved and validated now, at
+        construction — a chain that is empty, or empty once absent locales are
+        dropped, raises `ValidationError` here rather than mid-request. Omitting
+        it leaves the default policy — exact locale, same-language variants, then
+        the declared default — in place.
         """
         self._lexicon = lexicon
         self._fuzzy = fuzzy
@@ -40,31 +55,55 @@ class EntityResolver:
             locale.casefold(): SurfaceFormIndex.build(lexicon, locale)
             for locale in self._available
         }
+        self._explicit_chain = (
+            fallback.resolve_explicit_chain(fallback_chain, self._available)
+            if fallback_chain is not None
+            else None
+        )
 
     @classmethod
-    def from_file(cls, path: str | Path, *, fuzzy: bool = True) -> EntityResolver:
+    def from_file(
+        cls,
+        path: str | Path,
+        *,
+        fuzzy: bool = True,
+        fallback_chain: Iterable[str] | None = None,
+    ) -> EntityResolver:
         """Build a resolver from a lexicon JSON file."""
-        return cls(Lexicon.from_file(path), fuzzy=fuzzy)
+        return cls(Lexicon.from_file(path), fuzzy=fuzzy, fallback_chain=fallback_chain)
 
     @classmethod
     def from_dict(
-        cls, document: dict[str, Any], *, fuzzy: bool = True
+        cls,
+        document: dict[str, Any],
+        *,
+        fuzzy: bool = True,
+        fallback_chain: Iterable[str] | None = None,
     ) -> EntityResolver:
         """Build a resolver from an already-parsed lexicon document."""
-        return cls(Lexicon.from_dict(document), fuzzy=fuzzy)
+        return cls(
+            Lexicon.from_dict(document), fuzzy=fuzzy, fallback_chain=fallback_chain
+        )
 
     def transform(self, prompt: str, locale: str) -> MatchReport:
         """Resolve the jargon in `prompt`, read in `locale`, to canonical entities.
 
-        The requested locale is tried first; if it produces no match, the walk
-        continues through its same-language sibling variants and stops at the
-        first locale that produces any match — so every match in the report
-        comes from one locale, and the report names it. When no locale in the
-        chain matches, the report's resolved locale is the requested one and its
-        match list is empty, an ordinary result rather than an error.
+        Absent an explicit chain, the requested locale is tried first; if it
+        produces no match, the walk continues through its same-language sibling
+        variants and then the declared default. An explicit chain replaces that
+        policy with the fixed, pre-validated locale list configured at
+        construction. Either way the walk stops at the first locale that produces
+        any match — so every match in the report comes from one locale, and the
+        report names it. When no locale in the chain matches, the report's
+        resolved locale is the requested one and its match list is empty, an
+        ordinary result rather than an error.
         """
-        chain = fallback.build_chain(
-            locale, self._available, self._lexicon.default_locale
+        chain = (
+            self._explicit_chain
+            if self._explicit_chain is not None
+            else fallback.build_chain(
+                locale, self._available, self._lexicon.default_locale
+            )
         )
         for chain_locale in chain:
             matches = scan(

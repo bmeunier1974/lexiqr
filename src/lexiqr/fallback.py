@@ -19,6 +19,8 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 
+from lexiqr.errors import ValidationError
+
 
 def build_chain(
     requested: str, available: Iterable[str], default_locale: str
@@ -60,6 +62,42 @@ def build_chain(
     append(by_fold.get(default_locale.casefold()))
 
     return tuple(chain)
+
+
+def resolve_explicit_chain(
+    chain: Iterable[str], available: Iterable[str]
+) -> tuple[str, ...]:
+    """A caller's own chain, filtered to the lexicon and validated at build time.
+
+    An explicit chain fully replaces the default policy: the locales named here,
+    in this order, are the only ones walked — a caller who wants the declared
+    default as a backstop names it. Entries the lexicon does not declare are
+    dropped silently, since a partially-populated lexicon is normal; the
+    surviving tags carry the lexicon's own spelling. A chain that is empty, or
+    empty once absent locales are dropped, could never resolve any prompt, so it
+    is rejected here — at construction — rather than left to fail per request.
+    """
+    by_fold: dict[str, str] = {}
+    for locale in available:
+        by_fold.setdefault(locale.casefold(), locale)
+
+    resolved: list[str] = []
+    seen: set[str] = set()
+    for locale in chain:
+        present = by_fold.get(locale.casefold())
+        if present is not None and present.casefold() not in seen:
+            seen.add(present.casefold())
+            resolved.append(present)
+
+    if not resolved:
+        raise ValidationError(
+            "The explicit fallback chain names no locale the lexicon declares; "
+            "once locales the lexicon does not contain are dropped it is empty, "
+            "so no prompt could ever resolve. Name at least one locale the "
+            "lexicon actually declares.",
+            field="fallback_chain",
+        )
+    return tuple(resolved)
 
 
 def _language_subtag(locale: str) -> str:

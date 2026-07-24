@@ -11,8 +11,11 @@ when it too could match, and the report naming the locale that answered.
 from pathlib import Path
 from typing import Any
 
+import pytest
+
 from lexiqr import EntityResolver
-from lexiqr.fallback import build_chain
+from lexiqr.errors import ValidationError
+from lexiqr.fallback import build_chain, resolve_explicit_chain
 
 MEDIEN_DE = (
     Path(__file__).resolve().parent.parent
@@ -82,6 +85,39 @@ def test_the_declared_default_is_never_walked_twice() -> None:
 
 def test_a_declared_default_absent_from_the_lexicon_is_dropped() -> None:
     assert build_chain("fr-FR", ["en-GB"], "de-DE") == ()
+
+
+# --- Explicit chain resolution and validation (story #38) -------------------
+
+
+def test_an_explicit_chain_keeps_only_present_locales_in_the_order_given() -> None:
+    assert resolve_explicit_chain(
+        ["en-GB", "de-DE"], ["de-DE", "de-AT", "en-GB"]
+    ) == ("en-GB", "de-DE")
+
+
+def test_an_explicit_chain_drops_locales_absent_from_the_lexicon() -> None:
+    assert resolve_explicit_chain(["fr-FR", "de-DE"], ["de-DE"]) == ("de-DE",)
+
+
+def test_an_explicit_chain_matches_the_lexicon_case_insensitively() -> None:
+    assert resolve_explicit_chain(["DE-de"], ["de-DE"]) == ("de-DE",)
+
+
+def test_an_explicit_chain_deduplicates_keeping_the_first_position() -> None:
+    assert resolve_explicit_chain(
+        ["de-DE", "de-AT", "de-DE"], ["de-DE", "de-AT"]
+    ) == ("de-DE", "de-AT")
+
+
+def test_an_empty_explicit_chain_is_rejected() -> None:
+    with pytest.raises(ValidationError):
+        resolve_explicit_chain([], ["de-DE"])
+
+
+def test_an_explicit_chain_of_only_absent_locales_is_rejected() -> None:
+    with pytest.raises(ValidationError):
+        resolve_explicit_chain(["fr-FR"], ["de-DE"])
 
 
 # --- End to end through the resolver ----------------------------------------
@@ -178,3 +214,71 @@ def test_nothing_matching_even_in_the_default_stays_an_empty_result() -> None:
 
     assert report.matches == ()
     assert report.locale == "fr-FR"
+
+
+# --- Explicit chain through the resolver (story #38) ------------------------
+
+
+def test_an_explicit_chain_replaces_the_default_policy() -> None:
+    # The default policy would answer "rechnung" in de-AT (the requested locale);
+    # an explicit chain of only de-DE forces the walk there instead.
+    resolver = EntityResolver.from_dict(_de_variants(), fallback_chain=["de-DE"])
+
+    report = resolver.transform("die rechnung bitte", "de-AT")
+
+    assert all(match.matched_locale == "de-DE" for match in report.matches)
+    assert report.matches
+
+
+def test_an_explicit_chain_walks_locales_in_the_order_given() -> None:
+    de_first = EntityResolver.from_dict(
+        _de_variants(), fallback_chain=["de-DE", "de-AT"]
+    )
+    at_first = EntityResolver.from_dict(
+        _de_variants(), fallback_chain=["de-AT", "de-DE"]
+    )
+
+    assert (
+        de_first.transform("die rechnung bitte", "de-DE").matches[0].matched_locale
+        == "de-DE"
+    )
+    assert (
+        at_first.transform("die rechnung bitte", "de-DE").matches[0].matched_locale
+        == "de-AT"
+    )
+
+
+def test_from_file_accepts_an_explicit_chain() -> None:
+    resolver = EntityResolver.from_file(MEDIEN_DE, fallback_chain=["de-DE"])
+
+    report = resolver.transform("wo ist flooff", "de-AT")
+
+    assert report.matches[0].matched_locale == "de-DE"
+
+
+def test_an_absent_locale_in_the_chain_is_dropped_and_the_rest_proceed() -> None:
+    resolver = EntityResolver.from_dict(
+        _de_variants(), fallback_chain=["fr-FR", "de-DE"]
+    )
+
+    report = resolver.transform("wo ist flooff", "de-AT")
+
+    assert report.matches[0].matched_locale == "de-DE"
+
+
+def test_an_all_absent_explicit_chain_raises_at_construction() -> None:
+    with pytest.raises(ValidationError):
+        EntityResolver.from_dict(_de_variants(), fallback_chain=["fr-FR", "es-ES"])
+
+
+def test_an_empty_explicit_chain_raises_before_any_transform_call() -> None:
+    with pytest.raises(ValidationError):
+        EntityResolver.from_dict(_de_variants(), fallback_chain=[])
+
+
+def test_omitting_the_chain_leaves_the_default_policy_in_place() -> None:
+    resolver = EntityResolver.from_dict(_de_variants())
+
+    report = resolver.transform("die rechnung bitte", "de-AT")
+
+    assert report.matches[0].matched_locale == "de-AT"
