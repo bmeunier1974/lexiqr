@@ -46,6 +46,11 @@ git tag v0.0.1 && git push origin v0.0.1
 Publishing currently targets **TestPyPI**; the switch to real PyPI is a one-line
 change to `repository-url`, made once the pipe is proven.
 
+**Hard prerequisite of the `v1.0.0` tag:** [HERITAGE.md](HERITAGE.md) — the
+clean-room provenance note — must be present, and its wording must stand as the
+maintainer's own considered position, before 1.0 is tagged. This is a
+release-checklist item, deliberately not a CI check; see the note for why.
+
 ### One-time prerequisite: register the pending publisher
 
 **Before the first tag push**, the maintainer must register a *pending publisher*

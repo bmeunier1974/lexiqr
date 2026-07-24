@@ -92,6 +92,11 @@ uv run pytest    # the same suite CI runs on every push and pull request
 Release process and the one-time TestPyPI publisher registration live in
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
-## License
+## License and heritage
 
-MIT
+MIT — see [LICENSE](LICENSE).
+
+lexiqr's deterministic core is a clean-room reimplementation of a design first
+worked out on a private repository's branch 735: no branch-735 source was
+copied, only the documented design and the behavioral spec preserved here.
+[HERITAGE.md](HERITAGE.md) states the provenance position in full.
