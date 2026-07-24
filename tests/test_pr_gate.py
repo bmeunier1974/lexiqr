@@ -58,6 +58,53 @@ def test_the_gate_tests_every_python_version_the_package_advertises(
     assert tested == set(versions)
 
 
+def test_the_gate_compares_reports_across_operating_systems(workflow: Any) -> None:
+    """C9's third layer: a matrix over OS × Python that fails on a platform-
+    specific divergence. The gate must carry this dimension, or a report that
+    resolves differently on Windows than on Linux would ship unnoticed."""
+    os_jobs = [
+        job
+        for job in workflow["jobs"].values()
+        if "os" in job.get("strategy", {}).get("matrix", {})
+    ]
+    assert os_jobs, "no job runs a matrix over operating systems"
+
+    matrix = os_jobs[0]["strategy"]["matrix"]
+    assert {"ubuntu-latest", "macos-latest", "windows-latest"} <= set(matrix["os"])
+    assert set(matrix["python"]) == set(advertised_python_versions())
+    assert "${{ matrix.os }}" in os_jobs[0]["runs-on"]
+
+    steps = [step["run"] for step in os_jobs[0]["steps"] if "run" in step]
+    assert any("report_equality.py" in step for step in steps)
+
+
+def test_the_gate_enforces_the_performance_envelope_on_a_single_runner(
+    workflow: Any,
+) -> None:
+    """C11: the perf gate is one fixed-runner job, not a matrix. Timing across a
+    matrix would be noise; the gate needs one comparable environment. A second,
+    non-gating step records the raw numbers for trend-watching."""
+    perf_jobs = [
+        job
+        for job in workflow["jobs"].values()
+        if any(
+            "-m perf" in step.get("run", "") or "benchmark.py" in step.get("run", "")
+            for step in job["steps"]
+        )
+    ]
+    assert len(perf_jobs) == 1, "expected exactly one performance-gate job"
+
+    job = perf_jobs[0]
+    assert job["runs-on"] == "ubuntu-latest"  # a fixed OS, not a matrix
+    assert "matrix" not in job.get("strategy", {})
+
+    steps = [step.get("run", "") for step in job["steps"]]
+    assert any("-m perf" in step for step in steps), "the gate must run the perf tests"
+    assert any("benchmark.py" in step for step in steps), (
+        "raw timings must be recorded (non-gating)"
+    )
+
+
 def test_the_gate_lints_with_ruff(workflow: Any) -> None:
     assert any("ruff check" in step for step in all_run_steps(workflow))
 

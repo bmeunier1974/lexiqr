@@ -24,6 +24,17 @@ from lexiqr.errors import ValidationError
 #: The one lexicon format version core implements (ADR 0003).
 SCHEMA_VERSION = "1"
 
+#: The longest surface form core will accept, in Unicode code points. The schema
+#: bounds a surface form below (`minLength: 1`) but not above; core adds the
+#: upper bound because a surface form is matched as a whole word and compared
+#: under edit distance, so its length is a cost multiplier in every scan. A form
+#: far longer than any real label is not data a tenant meant to write — it is
+#: what a pathological lexicon looks like — and left unbounded it would make
+#: matching pathologically slow. Rejecting it at load turns a request-path hang
+#: into a validation-time error the author can fix. Documented in
+#: docs/lexicon-semantic-checks.md; changing it is a semver-visible change.
+MAX_SURFACE_FORM_LENGTH = 128
+
 #: The subset of BCP 47 the lexicon format accepts, mirroring the published
 #: schema's `$defs/locale` — language, optional script, optional region.
 _LOCALE = re.compile(r"[A-Za-z]{2,3}(-[A-Za-z]{4})?(-([A-Za-z]{2}|[0-9]{3}))?")
@@ -202,6 +213,17 @@ def _surface_forms(forms: Any, canonical_id: str, locale: str) -> SurfaceForms:
                 field,
                 f"is {surface_form!r}, which is only whitespace; that is not a "
                 f"label a user can type",
+            )
+        # Beyond the schema, which bounds a surface form's length below but not
+        # above (see docs/lexicon-semantic-checks.md). A form this long is not a
+        # label a user types; left in, it would make matching pathologically
+        # slow, so it is refused at load rather than at match time.
+        if len(surface_form) > MAX_SURFACE_FORM_LENGTH:
+            raise fault(
+                field,
+                f"is {len(surface_form)} characters long, which exceeds the "
+                f"maximum surface-form length of {MAX_SURFACE_FORM_LENGTH}; a "
+                f"label this long would make matching pathologically slow",
             )
 
     return SurfaceForms(

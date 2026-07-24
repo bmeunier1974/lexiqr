@@ -66,6 +66,19 @@ def test_a_surface_form_that_is_only_whitespace_is_rejected() -> None:
     assert error.field == "alternates[0]"
 
 
+def test_a_pathologically_long_surface_form_is_rejected_at_load() -> None:
+    """A surface form far longer than any real label would make matching
+    pathologically slow — so it is refused at load, not discovered in a request
+    path. The schema's minLength has no upper bound to express this."""
+    with pytest.raises(ValidationError) as raised:
+        EntityResolver.from_dict(load("pathological-surface-form"))
+
+    error = raised.value
+    assert error.canonical_id == "product"
+    assert error.locale == "de-DE"
+    assert error.field == "preferred.singular"
+
+
 def semantic_fixtures() -> list[Path]:
     return sorted(SEMANTIC_CORPUS.glob("*.lexicon.json"))
 

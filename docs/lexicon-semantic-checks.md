@@ -68,10 +68,33 @@ and it cannot participate in the whole-word matching lexiqr does. It is a data
 entry slip, and reporting it costs the author far less than discovering later
 that an entity never matches.
 
+## 4. A surface form may not exceed the maximum length
+
+**Fixture:** `pathological-surface-form.lexicon.json`
+
+`$defs/surfaceForm` sets `minLength: 1` but no upper bound, so a 200-character
+"label" passes the schema. Core caps a surface form at **128 code points**.
+
+*Why the schema cannot express it.* The schema *could* add a `maxLength`, and
+this is the one check that is a candidate to migrate there later. It stays in
+core for now because the bound exists for a matching-cost reason, not a document
+well-formedness one: the number belongs next to the matcher it protects, and
+pinning it here keeps the offline schema free of a performance constant that
+core owns. Moving it into the published schema would be a deliberate, recorded
+decision, not a default.
+
+*Why core rejects.* A surface form is matched as a whole word and compared under
+edit distance, so its length multiplies the cost of every scan. A form far
+longer than any real label is not data a tenant meant to write — it is what a
+pathological lexicon looks like — and left unbounded it would make matching
+pathologically slow. Rejecting it at load turns a request-path hang into a
+validation-time error the author can act on, which is where a bad lexicon should
+fail.
+
 ---
 
 ## For lexicon authors
 
 If offline validation passes and lexiqr still rejects your file, the error
 message names the entity, locale, and field — and the reason will be one of the
-three above. Nothing else in lexiqr rejects a schema-valid document.
+four above. Nothing else in lexiqr rejects a schema-valid document.
