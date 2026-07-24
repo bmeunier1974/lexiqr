@@ -48,6 +48,13 @@ dev = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# The performance gate is deselected from the default run — timing it in the
+# ordinary Python matrix would be noisy and slow. The dedicated perf CI job
+# selects it with `-m perf`, which overrides this default.
+addopts = ["-m", "not perf"]
+markers = [
+    "perf: the CI performance gate (C11); excluded from the default run, run with -m perf",
+]
 
 [tool.ruff]
 src = ["src", "tests"]

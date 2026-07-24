@@ -78,6 +78,33 @@ def test_the_gate_compares_reports_across_operating_systems(workflow: Any) -> No
     assert any("report_equality.py" in step for step in steps)
 
 
+def test_the_gate_enforces_the_performance_envelope_on_a_single_runner(
+    workflow: Any,
+) -> None:
+    """C11: the perf gate is one fixed-runner job, not a matrix. Timing across a
+    matrix would be noise; the gate needs one comparable environment. A second,
+    non-gating step records the raw numbers for trend-watching."""
+    perf_jobs = [
+        job
+        for job in workflow["jobs"].values()
+        if any(
+            "-m perf" in step.get("run", "") or "benchmark.py" in step.get("run", "")
+            for step in job["steps"]
+        )
+    ]
+    assert len(perf_jobs) == 1, "expected exactly one performance-gate job"
+
+    job = perf_jobs[0]
+    assert job["runs-on"] == "ubuntu-latest"  # a fixed OS, not a matrix
+    assert "matrix" not in job.get("strategy", {})
+
+    steps = [step.get("run", "") for step in job["steps"]]
+    assert any("-m perf" in step for step in steps), "the gate must run the perf tests"
+    assert any("benchmark.py" in step for step in steps), (
+        "raw timings must be recorded (non-gating)"
+    )
+
+
 def test_the_gate_lints_with_ruff(workflow: Any) -> None:
     assert any("ruff check" in step for step in all_run_steps(workflow))
 

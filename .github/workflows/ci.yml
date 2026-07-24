@@ -95,3 +95,29 @@ jobs:
 
       - name: Compare resolution against the cross-platform golden
         run: uv run --python ${{ matrix.python }} python scripts/report_equality.py --check
+
+  performance:
+    # The performance envelope (C11) as a build-failing gate: a single runner on
+    # one fixed Python, so the number is comparable run to run. It asserts the
+    # envelope × a stated headroom, so only a large regression trips it. A
+    # second, non-gating step records the raw timings so a trend stays visible
+    # even when the gate passes. Additive to the PR gate — no new trigger.
+    name: Performance gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Bootstrap the dev environment
+        run: uv sync --python 3.12
+
+      - name: Perf gate (envelope × headroom)
+        run: uv run --python 3.12 pytest -m perf
+
+      - name: Record raw timings (non-gating)
+        continue-on-error: true
+        run: uv run --python 3.12 python tests/perf/benchmark.py

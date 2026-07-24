@@ -43,6 +43,17 @@ snapshot = serialize_report(resolver.transform("wo ist flooff", locale="de-DE"))
 
 Both functions are public, semver-governed API: the serialized shape can only change on a major release, so a patch or minor upgrade never silently invalidates a stored snapshot.
 
+## Performance envelope
+
+lexiqr is built to sit in a request path, so its performance is a stated, CI-enforced contract, measured against the seeded **1,000-surface-form** benchmark lexicon:
+
+- **`transform()` p95 < 10 ms**
+- **initialization < 1 second** (cold)
+
+**How it is measured** (so you can reproduce it): initialization is timed cold — one resolver built once, nothing warmed. `transform()` p95 excludes warm-up — a fixed set of warm-up calls is discarded, then p95 is taken over a fixed number of timed iterations against the benchmark lexicon. A long-but-under-limit prompt is measured too, so the 10,000-character size limit is the only performance cliff, not a hidden one before it.
+
+**The gate vs. the guarantee.** The numbers above are the guarantee. The CI perf gate asserts the envelope multiplied by a **3× headroom factor** (p95 < 30 ms, init < 3 s) on a single fixed runner: shared CI runners are noisy, and the headroom turns that noise into a re-run rather than a false failure. A change has to make matching roughly an order of magnitude slower to trip the gate — catching subtle drift is not its job, which is why the raw timings are also recorded, un-gated, on every run.
+
 ## This repository
 
 This is a single-repo project: it is both the meta-repo (vision and blueprint) and the product repo (all four C4 containers ship from here as one wheel).
