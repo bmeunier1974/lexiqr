@@ -30,8 +30,8 @@ This is a single-repo project: it is both the meta-repo (vision and blueprint) a
 
 | Path | Container | What it is |
 |------|-----------|------------|
-| `src/lexiqr/` (excl. `cli.py`) | **core** | The deterministic resolution engine and public typed API |
-| `src/lexiqr/cli.py` | **cli** | `lexiqr validate` / `lexiqr try` for lexicon authors |
+| `src/lexiqr/` (excl. `cli/`) | **core** | The deterministic resolution engine and public typed API |
+| `src/lexiqr/cli/` | **cli** | `lexiqr validate` / `lexiqr try` for lexicon authors |
 | `schema/` | **schema** | The versioned JSON Schema for lexicon files, plus the shared fixture corpus |
 | `.github/workflows/`, `pyproject.toml` | **delivery** | CI gates and tag→PyPI trusted publishing |
 
@@ -43,7 +43,7 @@ Cross-container truth lives at the root:
 - [docs/adr/](docs/adr/) — architecture decision records (repo shape, contracts)
 - [docs/plans/](docs/plans/) — dependency-ordered implementation plans
 - [docs/lexicon-authoring.md](docs/lexicon-authoring.md) — writing and validating a lexicon
-  file, for authors who never install lexiqr
+  file, the `lexiqr validate` / `lexiqr try` CLI, and its scriptable exit-code contract
 - [docs/lexicon-semantic-checks.md](docs/lexicon-semantic-checks.md) — the complete list of
   checks core enforces beyond the published schema, and why
 - [docs/matching-rules.md](docs/matching-rules.md) — normalization, spans, score tiers,

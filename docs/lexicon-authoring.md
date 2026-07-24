@@ -75,6 +75,56 @@ hope — see [ADR 0003](adr/0003-core-schema-contract.md), and the test suite
 runs every fixture through both validators on every pull request to keep it
 true.
 
+## Checking a file with lexiqr itself
+
+If you install lexiqr, it ships a command line that needs no Python. It loads
+through the same code path the library does, so a file the CLI accepts is a file
+the library loads — and when a file is wrong, the CLI shows you the same error
+the library would raise, naming the entity, the locale, and the field.
+
+```bash
+pip install lexiqr
+
+# Is my file valid? (the same errors the library raises at load time)
+lexiqr validate my-tenant.lexicon.json
+
+# What does a real customer phrasing resolve to?
+lexiqr try my-tenant.lexicon.json --locale de-DE "wo ist flooff"
+```
+
+`lexiqr validate <lexicon>` takes one argument, the **lexicon** file to check.
+`lexiqr try <lexicon> --locale <locale> "<prompt>"` resolves a **prompt**,
+written in a **locale** (a BCP 47 tag), against the lexicon and prints the whole
+match report: every match with its canonical ID, the surface form that matched,
+the span marked in your prompt, the score tier, any correction a fuzzy match
+applied, and the locale that actually answered. Run either command with
+`--help` to see its arguments.
+
+### Exit codes
+
+Both commands exit with a code a script can branch on, so you can wire
+`lexiqr validate` into a pre-commit hook or CI job, and `lexiqr try` into a
+regression check over a list of known prompts, without lexiqr knowing anything
+about your pipeline. Results go to stdout; every diagnostic and error goes to
+stderr, so you can pipe or capture just the part you need.
+
+| Exit code | `validate` | `try` |
+|-----------|------------|-------|
+| `0` | the lexicon is valid | at least one match was found |
+| `1` | the lexicon is invalid — core rejected it | the lexicon is invalid |
+| `2` | a usage error: a missing or wrong argument | a usage error |
+| `3` | a CLI-level failure: the file is missing, unreadable, or not valid JSON | the same CLI-level failure |
+| `4` | — | no match: the lexicon loaded, but the prompt resolved to nothing |
+
+The distinctions are deliberate. A **load failure** — `1` for an invalid
+lexicon, `3` for a missing or malformed file — is always distinguishable from
+`try`'s **no match** (`4`), so a regression script can tell "your lexicon is
+broken" from "this prompt simply did not resolve". And a CLI-level failure (`3`)
+is distinguishable from an invalid lexicon (`1`), so "your path is wrong" never
+looks like "your lexicon is wrong". A usage error keeps code `2`, the
+conventional argument-parser code, and prints a usage message rather than a
+stack trace.
+
 ## The one exception
 
 There is a short list of problems the schema cannot express — an ambiguous

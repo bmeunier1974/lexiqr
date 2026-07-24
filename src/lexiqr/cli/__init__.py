@@ -127,26 +127,47 @@ def _lexicon_errors(document: Any) -> list[ValidationError] | None:
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="lexiqr",
-        description="Inspect and check lexicon files without writing Python.",
+        description="Check and try lexicon files from the terminal, without "
+        "writing Python.",
     )
-    subcommands = parser.add_subparsers(dest="command", required=True)
+    subcommands = parser.add_subparsers(
+        dest="command",
+        required=True,
+        metavar="{validate,try}",
+        title="commands",
+    )
 
     validate_command = subcommands.add_parser(
         "validate",
         help="Check whether a lexicon file is valid.",
+        description="Load a lexicon and report whether it is valid, with the "
+        "same errors the library raises at load time.",
     )
-    validate_command.add_argument("lexicon", help="Path to a lexicon JSON file.")
+    validate_command.add_argument(
+        "lexicon",
+        help="Path to the lexicon file (a JSON document) to check.",
+    )
 
     try_command = subcommands.add_parser(
         "try",
         help="Resolve a prompt against a lexicon and print the match report.",
+        description="Resolve a prompt, written in a locale, against a lexicon "
+        "and print the full match report.",
     )
-    try_command.add_argument("lexicon", help="Path to a lexicon JSON file.")
+    try_command.add_argument(
+        "lexicon",
+        help="Path to the lexicon file (a JSON document) to resolve against.",
+    )
     try_command.add_argument(
         "--locale",
         required=True,
-        help='BCP 47 tag the prompt is written in, e.g. "de-DE".',
+        metavar="LOCALE",
+        help="The locale the prompt is written in, as a BCP 47 tag "
+        '(e.g. "de-DE"); passed to the lexicon\'s fallback chain unchanged.',
     )
-    try_command.add_argument("prompt", help="The free-form text to resolve.")
+    try_command.add_argument(
+        "prompt",
+        help="The prompt: the free-form user text to resolve against the lexicon.",
+    )
 
     return parser

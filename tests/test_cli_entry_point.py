@@ -1,11 +1,14 @@
 """The `lexiqr` console entry point, exercised across the real process boundary."""
 
+import ast
 import shutil
 import subprocess
 import sys
 from pathlib import Path
 
 import pytest
+
+import lexiqr
 
 FIXTURE_PATH = (
     Path(__file__).resolve().parent.parent / "examples" / "flooff.lexicon.json"
@@ -47,25 +50,42 @@ def test_lexiqr_try_prints_the_match_report_and_exits_zero() -> None:
     assert "flooff" in result.stdout
 
 
-def test_the_cli_reaches_only_for_lexiqrs_public_api() -> None:
-    """ADR 0002: the cli↔core boundary is the public API, checked by construction.
+def test_the_cli_reaches_only_for_lexiqrs_documented_public_api() -> None:
+    """ADR 0002: the cli↔core boundary is the documented public API, statically.
 
-    Every reference into lexiqr from any CLI module must resolve either to the
-    package root (`from lexiqr import ...`, the public API) or to a sibling
-    module inside the `lexiqr.cli` package itself. A reach into a private core
-    submodule (`from lexiqr.matcher import ...`) fails here, not at review time.
+    Every reference into lexiqr from any CLI module must resolve to a name in
+    ``lexiqr.__all__`` (the semver-governed public API), or to a sibling module
+    inside the ``lexiqr.cli`` package itself. A name that is not exported, or a
+    reach into a private core submodule (``from lexiqr.matcher import ...``),
+    fails here on the first offence rather than at review time.
     """
     cli_package = Path(__file__).resolve().parent.parent / "src" / "lexiqr" / "cli"
+    public_api = set(lexiqr.__all__)
 
-    private_imports: list[str] = []
+    violations: list[str] = []
     for module in sorted(cli_package.rglob("*.py")):
-        for line in module.read_text(encoding="utf-8").splitlines():
-            stripped = line.strip()
-            if not stripped.startswith(("from lexiqr.", "import lexiqr.")):
-                continue
-            target = stripped.split()[1]
-            if target == "lexiqr.cli" or target.startswith("lexiqr.cli."):
-                continue
-            private_imports.append(f"{module.name}: {stripped}")
+        tree = ast.parse(module.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom):
+                where = node.module or ""
+                if where == "lexiqr":
+                    violations += [
+                        f"{module.name}: from lexiqr import {alias.name}"
+                        for alias in node.names
+                        if alias.name not in public_api
+                    ]
+                elif where == "lexiqr.cli" or where.startswith("lexiqr.cli."):
+                    continue
+                elif where == "lexiqr" or where.startswith("lexiqr."):
+                    violations.append(f"{module.name}: from {where} import ...")
+            elif isinstance(node, ast.Import):
+                for alias in node.names:
+                    name = alias.name
+                    if name in {"lexiqr", "lexiqr.cli"} or name.startswith(
+                        "lexiqr.cli."
+                    ):
+                        continue
+                    if name.startswith("lexiqr"):
+                        violations.append(f"{module.name}: import {name}")
 
-    assert private_imports == []
+    assert violations == []
