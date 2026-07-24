@@ -120,6 +120,33 @@ def test_an_explicit_chain_of_only_absent_locales_is_rejected() -> None:
         resolve_explicit_chain(["fr-FR"], ["de-DE"])
 
 
+# --- Deterministic same-language variant ordering (story #39) ---------------
+
+
+def test_sibling_variants_are_walked_in_ascending_tag_order() -> None:
+    assert build_chain("de-LU", ["de-DE", "de-CH", "de-AT"], "de-DE") == (
+        "de-AT",
+        "de-CH",
+        "de-DE",
+    )
+
+
+def test_the_sibling_ordering_ignores_the_order_locales_were_declared_in() -> None:
+    one = build_chain("de-LU", ["de-DE", "de-CH", "de-AT"], "de-DE")
+    another = build_chain("de-LU", ["de-AT", "de-DE", "de-CH"], "de-DE")
+
+    assert one == another == ("de-AT", "de-CH", "de-DE")
+
+
+def test_the_requested_variant_leads_even_when_a_sibling_sorts_earlier() -> None:
+    # de-CH sorts after de-AT, but being the exact requested locale it leads.
+    assert build_chain("de-CH", ["de-AT", "de-CH", "de-DE"], "de-DE") == (
+        "de-CH",
+        "de-AT",
+        "de-DE",
+    )
+
+
 # --- End to end through the resolver ----------------------------------------
 
 
@@ -282,3 +309,58 @@ def test_omitting_the_chain_leaves_the_default_policy_in_place() -> None:
     report = resolver.transform("die rechnung bitte", "de-AT")
 
     assert report.matches[0].matched_locale == "de-AT"
+
+
+# --- Deterministic variant ordering, end to end (story #39) -----------------
+
+
+def _invoice_in(*locales: str) -> dict[str, Any]:
+    """`invoice`/'rechnung' authored identically across the given variants."""
+    return {
+        "schemaVersion": "1",
+        "defaultLocale": "de-DE",
+        "entities": {
+            "invoice": {
+                "locales": {
+                    locale: {"preferred": {"singular": "rechnung"}}
+                    for locale in locales
+                }
+            }
+        },
+    }
+
+
+def test_the_earliest_sibling_answers_when_the_requested_variant_is_absent() -> None:
+    # de-LU is not authored; de-AT, de-CH, de-DE all could answer. de-AT sorts first.
+    resolver = EntityResolver.from_dict(_invoice_in("de-DE", "de-CH", "de-AT"))
+
+    report = resolver.transform("die rechnung bitte", "de-LU")
+
+    assert report.matches[0].matched_locale == "de-AT"
+
+
+def test_the_same_variant_answers_regardless_of_authoring_order() -> None:
+    one = EntityResolver.from_dict(_invoice_in("de-DE", "de-CH", "de-AT"))
+    another = EntityResolver.from_dict(_invoice_in("de-AT", "de-DE", "de-CH"))
+
+    assert (
+        one.transform("die rechnung bitte", "de-LU").matches[0].matched_locale
+        == another.transform("die rechnung bitte", "de-LU").matches[0].matched_locale
+        == "de-AT"
+    )
+
+
+def test_adding_the_matching_variant_takes_precedence_for_its_own_prompts() -> None:
+    # With only de-AT present, a de-CH prompt backstops through de-AT...
+    without = EntityResolver.from_dict(_invoice_in("de-AT"))
+    assert (
+        without.transform("die rechnung bitte", "de-CH").matches[0].matched_locale
+        == "de-AT"
+    )
+
+    # ...add the exact de-CH variant, and it answers its own prompts, ahead of de-AT.
+    with_ch = EntityResolver.from_dict(_invoice_in("de-AT", "de-CH"))
+    assert (
+        with_ch.transform("die rechnung bitte", "de-CH").matches[0].matched_locale
+        == "de-CH"
+    )

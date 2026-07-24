@@ -29,13 +29,22 @@ def build_chain(
 
     `available` is the set of locales the lexicon declares and `default_locale`
     its declared default. The chain is the exact requested locale (only if the
-    lexicon has it), then its same-language siblings in a deterministic order,
-    then the declared default as a final backstop — deduplicated, so a locale
-    already earlier in the chain (the default is often the requested locale
-    itself) is never walked twice. A default the lexicon does not actually
-    author is dropped, as any absent locale is; a request whose language has no
-    variant and whose default is unauthored yields an empty chain — the caller
-    reads that as "no locale to try", an ordinary outcome rather than an error.
+    lexicon has it), then its same-language siblings, then the declared default
+    as a final backstop — deduplicated, so a locale already earlier in the chain
+    (the default is often the requested locale itself) is never walked twice. A
+    default the lexicon does not actually author is dropped, as any absent locale
+    is; a request whose language has no variant and whose default is unauthored
+    yields an empty chain — the caller reads that as "no locale to try", an
+    ordinary outcome rather than an error.
+
+    Sibling variants are walked in **ascending order of their tag**, compared
+    case-insensitively — so `de-AT` before `de-CH` before `de-DE`. That rule is
+    total (deduplication leaves the tags distinct, so no two ever compare equal)
+    and independent of the order the lexicon declared its locales in, which is
+    what makes the same prompt resolve through the same variant on every run and
+    platform. Because the walk stops at the first match, this order decides which
+    variant answers when more than one could; the exact requested locale leading
+    the chain is why authoring a variant later makes it answer its own prompts.
 
     Tags in the returned chain carry the lexicon's own spelling, so a caller can
     report which locale answered in the casing the lexicon author wrote.
