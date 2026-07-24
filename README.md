@@ -4,25 +4,91 @@
 
 Where teams today hardcode synonym tables, retrain embeddings, or let an LLM guess, lexiqr is a pip-installable resolution layer that is **deterministic, explainable, and tenant-scoped**.
 
+## Quickstart
+
+Install it:
+
 ```bash
 pip install lexiqr
 ```
 
+A lexicon maps one tenant's private jargon to canonical entities. Here a German
+tenant maps **flooff** to the `product` entity — this is the file the examples
+below run against:
+
+<!-- quickstart:file lexicon.json -->
+```json
+{
+  "schemaVersion": "1",
+  "defaultLocale": "de-DE",
+  "entities": {
+    "product": {
+      "locales": {
+        "de-DE": { "preferred": { "singular": "flooff" } }
+      }
+    }
+  }
+}
+```
+
+Resolve a prompt in Python. Typo tolerance is on by default, so the typo
+`floof` still resolves and the match carries a correction naming what was typed:
+
+<!-- quickstart:python -->
 ```python
 from lexiqr import EntityResolver
 
 resolver = EntityResolver.from_file("lexicon.json")
-report = resolver.transform("wo ist flooff", locale="de-DE")
-# → one match: entity "product", surface "flooff", span (7, 13), tier "preferred"
 
-# Typo tolerance is on by default: "floof" still resolves, and the match carries
-# a correction naming what was typed. Pass fuzzy=False for exact-only behaviour.
-exact_only = EntityResolver.from_file("lexicon.json", fuzzy=False)
+# "flooff" resolves to the product entity, with its character span and tier.
+match = resolver.transform("wo ist flooff", locale="de-DE").matches[0]
+print(f"{match.canonical_id} <- {match.surface_form!r} at {match.span}, tier {match.score_tier.value}")
+
+# The typo "floof" still resolves; the match names what was typed.
+typo = resolver.transform("wo ist floof", locale="de-DE").matches[0]
+print(f"corrected {typo.correction!r} -> {typo.surface_form!r}")
 ```
 
-The `fuzzy` keyword — accepted by `EntityResolver(...)`, `from_file`, and `from_dict`, defaulting to `True` — is public, semver-governed API.
+<!-- quickstart:expected -->
+```text
+product <- 'flooff' at (7, 13), tier preferred
+corrected 'floof' -> 'flooff'
+```
 
-> **Status:** pre-1.0 — under active development. The API above is the target contract.
+Lexicon authors don't need Python: the same lexicon checks and runs from the
+command line. `lexiqr validate` confirms the file is well-formed —
+
+<!-- quickstart:shell -->
+```bash
+lexiqr validate lexicon.json
+```
+
+<!-- quickstart:expected -->
+```text
+lexicon.json: valid lexicon.
+```
+
+— and `lexiqr try` resolves a prompt against it, showing the same match the
+developer sees:
+
+<!-- quickstart:shell -->
+```bash
+lexiqr try lexicon.json --locale de-DE "wo ist flooff"
+```
+
+<!-- quickstart:expected -->
+```text
+prompt: "wo ist [flooff]"
+resolved via: de-DE
+1 match:
+
+  [1] product ← "flooff"
+      tier: preferred   locale: de-DE   text: "flooff"
+```
+
+The `fuzzy` keyword — accepted by `EntityResolver(...)`, `from_file`, and `from_dict`, defaulting to `True` — is public, semver-governed API; pass `fuzzy=False` for exact-only behaviour.
+
+> **Status:** pre-1.0 — under active development.
 
 ## Input limits
 

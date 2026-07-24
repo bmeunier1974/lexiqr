@@ -31,3 +31,8 @@ down under a new `## [x.y.z]` heading dated on the day it ships.
   build-time test asserts the wheel's contents (schema, `py.typed`, console
   entry point) and release-quality metadata.
 - Package metadata: an issue-tracker link and a changelog link on the PyPI page.
+- Heritage / provenance note (`HERITAGE.md`) recording the clean-room position,
+  alongside a `LICENSE` file, referenced from the README.
+- Executable README quickstart: the founding flooff story for both actors runs
+  in CI (`tests/test_readme_quickstart.py`) against the README's own inline
+  lexicon, so the front page cannot drift from the shipped API.
