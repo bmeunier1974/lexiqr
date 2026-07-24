@@ -156,7 +156,7 @@ def test_a_correctly_spelled_and_a_misspelled_term_both_resolve() -> None:
 
 
 def test_a_region_the_exact_scan_claimed_yields_no_fuzzy_candidate() -> None:
-    """"ticket" is one edit from "ticker", but the exact scan already claimed it,
+    """ "ticket" is one edit from "ticker", but the exact scan already claimed it,
     so tolerance never re-examines the word and no second, fuzzy match appears."""
     resolver = EntityResolver.from_dict(
         lexicon(

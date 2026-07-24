@@ -97,3 +97,57 @@ def test_the_document_is_discoverable_from_the_readme() -> None:
     readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
 
     assert "docs/matching-rules.md" in readme
+
+
+@pytest.fixture
+def fallback(rules: str) -> str:
+    """The locale-fallback section (§5), isolated from its neighbours."""
+    return rules.split("## 5.")[1].split("## 6.")[0]
+
+
+@pytest.mark.parametrize(
+    "topic",
+    [
+        "fallback chain",  # the mechanism has a name
+        "built once",  # resolved at initialization, not per call
+        "first locale with any match",  # the load-bearing precedence rule
+        "one locale",  # every match in a report comes from one locale
+        "matched_locale",  # the report names which locale answered
+        "opaque identifiers",  # tags compared as written
+        "language detection",  # named as a non-goal
+        "fallback_chain",  # the explicit-override keyword
+        "ValidationError",  # how a bad explicit chain is rejected
+    ],
+)
+def test_the_locale_fallback_policy_is_documented(fallback: str, topic: str) -> None:
+    assert topic in fallback
+
+
+def test_the_default_chain_policy_is_published_as_an_ordered_list(
+    fallback: str,
+) -> None:
+    positions = [
+        fallback.index("exact locale"),
+        fallback.index("same-language variants"),
+        fallback.index("declared `defaultLocale`"),
+    ]
+
+    assert positions == sorted(positions)
+
+
+def test_an_explicit_chain_is_documented_as_replacing_the_default(
+    fallback: str,
+) -> None:
+    assert "replaces" in fallback  # replaces, not extends
+    assert "at construction" in fallback  # validated at initialization
+
+
+def test_the_composition_with_typo_tolerance_is_documented(fallback: str) -> None:
+    composition = fallback.split("### Fallback composes")[1]
+
+    assert "fuzzy" in composition
+    assert "beats an exact match" in composition  # earlier fuzzy beats later exact
+
+
+def test_the_fallback_section_states_it_is_semver_governed(fallback: str) -> None:
+    assert "semver" in fallback

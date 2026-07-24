@@ -104,9 +104,7 @@ class SurfaceFormIndex:
                 if folded and folded not in seen:
                     seen.add(folded)
                     _insert(root, folded, canonical_id, surface_form, tier)
-                    forms.append(
-                        SurfaceForm(folded, canonical_id, surface_form, tier)
-                    )
+                    forms.append(SurfaceForm(folded, canonical_id, surface_form, tier))
         _link_failures(root)
         return cls(root, tuple(forms))
 

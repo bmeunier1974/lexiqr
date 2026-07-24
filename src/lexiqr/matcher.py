@@ -16,22 +16,22 @@ from __future__ import annotations
 
 from lexiqr import fuzzy
 from lexiqr.index import SurfaceFormIndex
-from lexiqr.lexicon import Lexicon
 from lexiqr.normalizer import Normalized, normalize
 from lexiqr.overlaps import Candidate, resolve
 from lexiqr.types import EntityMatch
 
 
 def scan(
-    prompt: str, lexicon: Lexicon, locale: str, *, fuzzy_enabled: bool = True
+    prompt: str, index: SurfaceFormIndex, locale: str, *, fuzzy_enabled: bool = True
 ) -> tuple[EntityMatch, ...]:
-    """Resolve `prompt`, read in `locale`: exact scan, then fuzzy over the rest.
+    """Resolve `prompt`, read in `locale`, against `locale`'s prebuilt index.
 
-    With `fuzzy_enabled` off the second pass is skipped outright, not run and
-    filtered — exact-only mode does no fuzzy work at all.
+    The index is compiled once at resolver construction and handed in, so a
+    `transform()` call — including each locale a fallback chain walks — does no
+    index-building work. With `fuzzy_enabled` off the second pass is skipped
+    outright, not run and filtered — exact-only mode does no fuzzy work at all.
     """
     normalized = normalize(prompt, locale)
-    index = SurfaceFormIndex.build(lexicon, locale)
 
     exact = index.scan(normalized.text)
     covered = tuple(hit.span for hit in exact)

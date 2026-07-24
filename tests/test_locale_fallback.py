@@ -1,0 +1,430 @@
+"""Locale fallback: a prompt in one variant resolves through a sibling variant.
+
+Two things are asserted here, and only these two — never how the chain is built
+internally. First, the pure chain builder: given the locales a lexicon actually
+declares and the locale a caller asked for, which locales get walked and in what
+order. Second, the end-to-end behaviour through `EntityResolver`: a `de-AT`
+prompt resolving against `de-DE` surface forms, the requested locale winning
+when it too could match, and the report naming the locale that answered.
+"""
+
+from pathlib import Path
+from typing import Any
+
+import pytest
+
+from lexiqr import EntityResolver
+from lexiqr.errors import ValidationError
+from lexiqr.fallback import build_chain, resolve_explicit_chain
+
+MEDIEN_DE = (
+    Path(__file__).resolve().parent.parent
+    / "schema"
+    / "fixtures"
+    / "valid"
+    / "medien-de.lexicon.json"
+)
+
+
+# --- The chain builder, in isolation (no matching pipeline) -----------------
+
+
+def test_the_exact_requested_locale_is_the_head_of_the_chain() -> None:
+    assert build_chain("de-DE", ["de-DE", "de-AT", "de-CH"], "de-DE")[0] == "de-DE"
+
+
+def test_same_language_siblings_follow_the_exact_locale() -> None:
+    assert build_chain("de-DE", ["de-DE", "de-AT", "en-GB"], "de-DE") == (
+        "de-DE",
+        "de-AT",
+    )
+
+
+def test_a_requested_locale_absent_from_the_lexicon_falls_to_its_siblings() -> None:
+    assert build_chain("de-AT", ["de-DE"], "de-DE") == ("de-DE",)
+
+
+def test_an_unrelated_language_enters_the_chain_only_as_the_declared_default() -> None:
+    # en-GB and fr-FR are unrelated to de; neither is the default, so neither
+    # is walked. (The declared default's own place is asserted below.)
+    assert build_chain("de-DE", ["de-DE", "en-GB", "fr-FR"], "de-DE") == ("de-DE",)
+
+
+def test_tags_are_compared_case_insensitively() -> None:
+    chain = build_chain("DE-de", ["de-DE", "DE-at"], "de-DE")
+
+    assert chain[0].casefold() == "de-de"
+    assert {tag.casefold() for tag in chain} == {"de-de", "de-at"}
+
+
+def test_the_sibling_order_is_deterministic_and_deduplicated() -> None:
+    one = build_chain("de-DE", ["de-DE", "de-AT", "de-CH", "de-DE"], "de-DE")
+    another = build_chain("de-DE", ["de-CH", "de-AT", "de-DE"], "de-DE")
+
+    assert one == another == ("de-DE", "de-AT", "de-CH")
+
+
+# --- The declared default as the final backstop (story #37) -----------------
+
+
+def test_the_declared_default_ends_a_chain_whose_language_has_no_variant() -> None:
+    # fr-FR has no variant in the lexicon; the declared default de-DE ends it.
+    assert build_chain("fr-FR", ["de-DE", "en-GB"], "de-DE") == ("de-DE",)
+
+
+def test_the_default_is_tried_after_the_exact_locale_and_its_siblings() -> None:
+    chain = build_chain("de-DE", ["de-DE", "de-AT", "en-GB"], "en-GB")
+
+    assert chain == ("de-DE", "de-AT", "en-GB")
+
+
+def test_the_declared_default_is_never_walked_twice() -> None:
+    # The requested locale is itself the default; it appears once, at the head.
+    assert build_chain("de-DE", ["de-DE", "de-AT"], "de-DE") == ("de-DE", "de-AT")
+
+
+def test_a_declared_default_absent_from_the_lexicon_is_dropped() -> None:
+    assert build_chain("fr-FR", ["en-GB"], "de-DE") == ()
+
+
+# --- Explicit chain resolution and validation (story #38) -------------------
+
+
+def test_an_explicit_chain_keeps_only_present_locales_in_the_order_given() -> None:
+    assert resolve_explicit_chain(["en-GB", "de-DE"], ["de-DE", "de-AT", "en-GB"]) == (
+        "en-GB",
+        "de-DE",
+    )
+
+
+def test_an_explicit_chain_drops_locales_absent_from_the_lexicon() -> None:
+    assert resolve_explicit_chain(["fr-FR", "de-DE"], ["de-DE"]) == ("de-DE",)
+
+
+def test_an_explicit_chain_matches_the_lexicon_case_insensitively() -> None:
+    assert resolve_explicit_chain(["DE-de"], ["de-DE"]) == ("de-DE",)
+
+
+def test_an_explicit_chain_deduplicates_keeping_the_first_position() -> None:
+    assert resolve_explicit_chain(["de-DE", "de-AT", "de-DE"], ["de-DE", "de-AT"]) == (
+        "de-DE",
+        "de-AT",
+    )
+
+
+def test_an_empty_explicit_chain_is_rejected() -> None:
+    with pytest.raises(ValidationError):
+        resolve_explicit_chain([], ["de-DE"])
+
+
+def test_an_explicit_chain_of_only_absent_locales_is_rejected() -> None:
+    with pytest.raises(ValidationError):
+        resolve_explicit_chain(["fr-FR"], ["de-DE"])
+
+
+# --- Deterministic same-language variant ordering (story #39) ---------------
+
+
+def test_sibling_variants_are_walked_in_ascending_tag_order() -> None:
+    assert build_chain("de-LU", ["de-DE", "de-CH", "de-AT"], "de-DE") == (
+        "de-AT",
+        "de-CH",
+        "de-DE",
+    )
+
+
+def test_the_sibling_ordering_ignores_the_order_locales_were_declared_in() -> None:
+    one = build_chain("de-LU", ["de-DE", "de-CH", "de-AT"], "de-DE")
+    another = build_chain("de-LU", ["de-AT", "de-DE", "de-CH"], "de-DE")
+
+    assert one == another == ("de-AT", "de-CH", "de-DE")
+
+
+def test_the_requested_variant_leads_even_when_a_sibling_sorts_earlier() -> None:
+    # de-CH sorts after de-AT, but being the exact requested locale it leads.
+    assert build_chain("de-CH", ["de-AT", "de-CH", "de-DE"], "de-DE") == (
+        "de-CH",
+        "de-AT",
+        "de-DE",
+    )
+
+
+# --- End to end through the resolver ----------------------------------------
+
+
+def _de_variants() -> dict[str, Any]:
+    """`product` authored only in de-DE; `invoice` in both de-DE and de-AT."""
+    return {
+        "schemaVersion": "1",
+        "defaultLocale": "de-DE",
+        "entities": {
+            "product": {"locales": {"de-DE": {"preferred": {"singular": "flooff"}}}},
+            "invoice": {
+                "locales": {
+                    "de-DE": {"preferred": {"singular": "rechnung"}},
+                    "de-AT": {"preferred": {"singular": "rechnung"}},
+                }
+            },
+        },
+    }
+
+
+def test_a_de_at_prompt_resolves_through_de_de_surface_forms() -> None:
+    resolver = EntityResolver.from_dict(_de_variants())
+
+    report = resolver.transform("wo ist flooff", "de-AT")
+
+    assert [match.canonical_id for match in report.matches] == ["product"]
+    assert all(match.matched_locale == "de-DE" for match in report.matches)
+    assert report.locale == "de-DE"
+
+
+def test_the_exact_requested_locale_answers_and_the_walk_stops_there() -> None:
+    # "rechnung" is declared in both de-AT and de-DE; the requested de-AT wins.
+    report = EntityResolver.from_dict(_de_variants()).transform(
+        "die rechnung bitte", "de-AT"
+    )
+
+    assert [match.canonical_id for match in report.matches] == ["invoice"]
+    assert all(match.matched_locale == "de-AT" for match in report.matches)
+    assert report.locale == "de-AT"
+
+
+def test_a_prompt_matching_nothing_in_the_chain_keeps_the_requested_locale() -> None:
+    report = EntityResolver.from_dict(_de_variants()).transform(
+        "wo ist der bahnhof", "de-AT"
+    )
+
+    assert report.matches == ()
+    assert report.locale == "de-AT"
+
+
+def test_spans_and_tiers_are_identical_on_a_fallback_match() -> None:
+    resolver = EntityResolver.from_dict(_de_variants())
+
+    fallback = resolver.transform("wo ist flooff", "de-AT").matches[0]
+    direct = resolver.transform("wo ist flooff", "de-DE").matches[0]
+
+    assert fallback.span == direct.span
+    assert fallback.score_tier == direct.score_tier
+
+
+def test_repeated_transforms_return_identical_reports() -> None:
+    resolver = EntityResolver.from_dict(_de_variants())
+
+    assert resolver.transform("wo ist flooff", "de-AT") == resolver.transform(
+        "wo ist flooff", "de-AT"
+    )
+
+
+def test_the_sibling_variant_fixture_drives_fallback_end_to_end() -> None:
+    report = EntityResolver.from_file(MEDIEN_DE).transform("wo ist flooff", "de-AT")
+
+    assert [match.canonical_id for match in report.matches] == ["product"]
+    assert report.matches[0].matched_locale == "de-DE"
+    assert report.locale == "de-DE"
+
+
+def test_an_unrelated_locale_resolves_through_the_declared_default() -> None:
+    # defaultLocale is de-DE; a fr-FR prompt has no variant, so it backstops there.
+    resolver = EntityResolver.from_dict(_de_variants())
+
+    report = resolver.transform("wo ist flooff", "fr-FR")
+
+    assert [match.canonical_id for match in report.matches] == ["product"]
+    assert all(match.matched_locale == "de-DE" for match in report.matches)
+    assert report.locale == "de-DE"
+
+
+def test_nothing_matching_even_in_the_default_stays_an_empty_result() -> None:
+    resolver = EntityResolver.from_dict(_de_variants())
+
+    report = resolver.transform("wo ist der bahnhof", "fr-FR")
+
+    assert report.matches == ()
+    assert report.locale == "fr-FR"
+
+
+# --- Explicit chain through the resolver (story #38) ------------------------
+
+
+def test_an_explicit_chain_replaces_the_default_policy() -> None:
+    # The default policy would answer "rechnung" in de-AT (the requested locale);
+    # an explicit chain of only de-DE forces the walk there instead.
+    resolver = EntityResolver.from_dict(_de_variants(), fallback_chain=["de-DE"])
+
+    report = resolver.transform("die rechnung bitte", "de-AT")
+
+    assert all(match.matched_locale == "de-DE" for match in report.matches)
+    assert report.matches
+
+
+def test_an_explicit_chain_walks_locales_in_the_order_given() -> None:
+    de_first = EntityResolver.from_dict(
+        _de_variants(), fallback_chain=["de-DE", "de-AT"]
+    )
+    at_first = EntityResolver.from_dict(
+        _de_variants(), fallback_chain=["de-AT", "de-DE"]
+    )
+
+    assert (
+        de_first.transform("die rechnung bitte", "de-DE").matches[0].matched_locale
+        == "de-DE"
+    )
+    assert (
+        at_first.transform("die rechnung bitte", "de-DE").matches[0].matched_locale
+        == "de-AT"
+    )
+
+
+def test_from_file_accepts_an_explicit_chain() -> None:
+    resolver = EntityResolver.from_file(MEDIEN_DE, fallback_chain=["de-DE"])
+
+    report = resolver.transform("wo ist flooff", "de-AT")
+
+    assert report.matches[0].matched_locale == "de-DE"
+
+
+def test_an_absent_locale_in_the_chain_is_dropped_and_the_rest_proceed() -> None:
+    resolver = EntityResolver.from_dict(
+        _de_variants(), fallback_chain=["fr-FR", "de-DE"]
+    )
+
+    report = resolver.transform("wo ist flooff", "de-AT")
+
+    assert report.matches[0].matched_locale == "de-DE"
+
+
+def test_an_all_absent_explicit_chain_raises_at_construction() -> None:
+    with pytest.raises(ValidationError):
+        EntityResolver.from_dict(_de_variants(), fallback_chain=["fr-FR", "es-ES"])
+
+
+def test_an_empty_explicit_chain_raises_before_any_transform_call() -> None:
+    with pytest.raises(ValidationError):
+        EntityResolver.from_dict(_de_variants(), fallback_chain=[])
+
+
+def test_omitting_the_chain_leaves_the_default_policy_in_place() -> None:
+    resolver = EntityResolver.from_dict(_de_variants())
+
+    report = resolver.transform("die rechnung bitte", "de-AT")
+
+    assert report.matches[0].matched_locale == "de-AT"
+
+
+# --- Deterministic variant ordering, end to end (story #39) -----------------
+
+
+def _invoice_in(*locales: str) -> dict[str, Any]:
+    """`invoice`/'rechnung' authored identically across the given variants."""
+    return {
+        "schemaVersion": "1",
+        "defaultLocale": "de-DE",
+        "entities": {
+            "invoice": {
+                "locales": {
+                    locale: {"preferred": {"singular": "rechnung"}}
+                    for locale in locales
+                }
+            }
+        },
+    }
+
+
+def test_the_earliest_sibling_answers_when_the_requested_variant_is_absent() -> None:
+    # de-LU is not authored; de-AT, de-CH, de-DE all could answer. de-AT sorts first.
+    resolver = EntityResolver.from_dict(_invoice_in("de-DE", "de-CH", "de-AT"))
+
+    report = resolver.transform("die rechnung bitte", "de-LU")
+
+    assert report.matches[0].matched_locale == "de-AT"
+
+
+def test_the_same_variant_answers_regardless_of_authoring_order() -> None:
+    one = EntityResolver.from_dict(_invoice_in("de-DE", "de-CH", "de-AT"))
+    another = EntityResolver.from_dict(_invoice_in("de-AT", "de-DE", "de-CH"))
+
+    assert (
+        one.transform("die rechnung bitte", "de-LU").matches[0].matched_locale
+        == another.transform("die rechnung bitte", "de-LU").matches[0].matched_locale
+        == "de-AT"
+    )
+
+
+def test_adding_the_matching_variant_takes_precedence_for_its_own_prompts() -> None:
+    # With only de-AT present, a de-CH prompt backstops through de-AT...
+    without = EntityResolver.from_dict(_invoice_in("de-AT"))
+    assert (
+        without.transform("die rechnung bitte", "de-CH").matches[0].matched_locale
+        == "de-AT"
+    )
+
+    # ...add the exact de-CH variant, and it answers its own prompts, ahead of de-AT.
+    with_ch = EntityResolver.from_dict(_invoice_in("de-AT", "de-CH"))
+    assert (
+        with_ch.transform("die rechnung bitte", "de-CH").matches[0].matched_locale
+        == "de-CH"
+    )
+
+
+# --- Fallback composes with the fuzzy pass (story #40) ----------------------
+
+
+def test_a_misspelled_form_in_a_fallback_locale_resolves_with_its_correction() -> None:
+    # product/'flooff' is authored only in de-DE; a misspelled de-AT prompt
+    # resolves through the de-DE fallback, carrying its correction.
+    resolver = EntityResolver.from_dict(_de_variants())
+
+    report = resolver.transform("wo ist floof", "de-AT")
+
+    match = report.matches[0]
+    assert match.canonical_id == "product"
+    assert match.surface_form == "flooff"
+    assert match.correction == "floof"
+    assert match.matched_locale == "de-DE"
+    assert report.locale == "de-DE"
+
+
+def test_an_earlier_fuzzy_match_beats_a_later_exact_match() -> None:
+    # de-AT (earlier) fuzzy-matches the typed word; de-DE (later) would match it
+    # exactly. Chain position is decided before match quality, so de-AT wins.
+    lexicon = {
+        "schemaVersion": "1",
+        "defaultLocale": "de-DE",
+        "entities": {
+            "product": {
+                "locales": {
+                    "de-AT": {"preferred": {"singular": "flooof"}},
+                    "de-DE": {"preferred": {"singular": "flooff"}},
+                }
+            }
+        },
+    }
+
+    report = EntityResolver.from_dict(lexicon).transform("wo ist flooff", "de-AT")
+
+    match = report.matches[0]
+    assert match.matched_locale == "de-AT"
+    assert match.surface_form == "flooof"
+    assert match.correction == "flooff"
+
+
+def test_matched_locale_names_the_fallback_that_produced_the_correction() -> None:
+    resolver = EntityResolver.from_dict(_de_variants())
+
+    report = resolver.transform("wo ist floof", "fr-FR")
+
+    assert report.matches[0].correction == "floof"
+    assert report.matches[0].matched_locale == "de-DE"
+
+
+def test_with_fuzzy_off_fallback_still_resolves_exact_only() -> None:
+    resolver = EntityResolver.from_dict(_de_variants(), fuzzy=False)
+
+    exact = resolver.transform("wo ist flooff", "de-AT")
+    assert exact.matches[0].matched_locale == "de-DE"
+    assert exact.matches[0].correction is None
+
+    misspelled = resolver.transform("wo ist floof", "de-AT")
+    assert misspelled.matches == ()

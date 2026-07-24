@@ -65,13 +65,78 @@ Every match carries a `score_tier` saying how it was found:
 If an entity's canonical ID reads the same as one of its own labels, that is one
 surface form declared once, at its best tier — not two competing candidates.
 
-## 5. Only the locale you asked for is searched
+## 5. Matching resolves through a locale fallback chain
 
-`transform(prompt, locale)` searches the surface forms that `locale` declares
-and nothing else. A German form never matches an English prompt. If the lexicon
-declares nothing for that locale, you get an empty match list — an ordinary
-result, not an error. (The fallback chain that consults related locales is a
-later plan; today `matched_locale` always equals the locale you passed.)
+`transform(prompt, locale)` does not search only the locale you named. It walks
+a **fallback chain** — an ordered list of locales — and stops at the first one
+that produces any match. The chain is built once, when you construct the
+resolver, so repeated calls never rebuild it and resolve identically.
+
+By default the chain is, in order:
+
+1. **The exact locale you asked for**, if the lexicon declares it.
+2. **Its same-language variants** the lexicon declares, in ascending order of
+   their tag compared case-insensitively — `de-AT` before `de-CH` before
+   `de-DE`. So a `de-AT` prompt resolves against `de-DE` surface forms when the
+   lexicon authored the German once, under `de-DE`.
+3. **The lexicon's declared `defaultLocale`**, as a final backstop, so there is
+   always one last locale to try before giving up.
+
+Each locale appears once; one already earlier in the chain is not walked again.
+A locale the lexicon does not declare is skipped, so a partially populated
+lexicon never breaks resolution.
+
+**The first locale with any match wins, and the walk stops there.** Every match
+in a report therefore comes from *one locale* — results are never mixed across
+locales — and the report names it: each match's `matched_locale`, and the
+report's resolved `locale`, are the locale that actually answered, not
+necessarily the one you asked for. When no locale in the chain matches, you get
+an empty match list — an ordinary result, not an error — and the report's
+resolved locale is the one you passed.
+
+Because the walk stops at the first *matching* locale rather than weighing every
+locale's best match, the common case — the locale you asked for has the match —
+costs exactly what it did before fallback existed: the walk stops immediately.
+
+### An explicit chain replaces the default policy
+
+Pass `fallback_chain` to `EntityResolver(...)`, `EntityResolver.from_file`, or
+`EntityResolver.from_dict` to supply your own ordered list of locales. An
+explicit chain **fully replaces** the default policy — it does not extend it, so
+only the locales you name (and that the lexicon declares) are walked, in the
+order you gave. If you want the declared default as a backstop, name it. The
+chain is resolved and validated when you build the resolver: locales the lexicon
+does not declare are dropped, and a chain that is empty — or empty once absent
+locales are dropped — raises `ValidationError` **at construction**, so a
+misconfiguration surfaces at startup rather than mid-request. There are no
+per-call overrides; `transform()`'s signature is unchanged.
+
+### Locale tags are opaque identifiers
+
+lexiqr never inspects your prompt to guess its language, and it never consults a
+locale registry. Tags are compared as written, case-insensitively, and the only
+structure it reads is the leading language subtag — `de` in `de-AT` — used
+solely to group same-language variants. There is no language detection, no
+canonicalization, and no alias resolution.
+
+### Fallback composes with typo tolerance
+
+Each locale in the chain is evaluated with the *complete* pipeline for that
+locale — the exact scan then the fuzzy pass (§8) — before the walk moves on. So
+a misspelled word still resolves through a fallback locale, carrying its
+correction and a `matched_locale` naming that locale. One consequence follows
+from chain position being decided before match quality: a fuzzy match in an
+earlier chain locale **beats an exact match in a later one**. The locale you
+asked for stays authoritative, even when a fallback locale held a perfectly
+spelled alternative. With `fuzzy=False`, each locale is evaluated exact-only and
+the same walk applies.
+
+Everything in this section is public, **semver**-governed behaviour, for the
+same reason the rules above are: determinism makes which locale answers a given
+prompt something you can predict and rely on, not reverse-engineer. What lexiqr
+does *not* do is as fixed as what it does — no language detection, no per-call
+chain overrides, and no merging of matches across locales beyond the chain's
+first-match-wins precedence.
 
 ## 6. When two forms claim the same text, exactly one wins
 

@@ -57,6 +57,7 @@ def _edit_budget(folded_length: int) -> int:
         return 1
     return 0
 
+
 #: Best tier first, matching the overlap resolver's ranking. Used only to break
 #: ties between candidates that are otherwise equally good corrections.
 _TIER_RANK = {
@@ -143,8 +144,7 @@ def _fuzzy_candidates(forms: tuple[SurfaceForm, ...]) -> tuple[SurfaceForm, ...]
 def _tokens(text: str) -> list[tuple[str, tuple[int, int]]]:
     """Every word token of `text`, with its span, in order."""
     return [
-        (match.group(), (match.start(), match.end()))
-        for match in _WORD.finditer(text)
+        (match.group(), (match.start(), match.end())) for match in _WORD.finditer(text)
     ]
 
 
