@@ -11,6 +11,13 @@ changed in exactly one place.
 The accepted form this guard hands on is the text *unchanged*: the guard bounds
 and rejects, it never mangles. Spans reported downstream therefore keep indexing
 the prompt the user actually typed.
+
+Two of the guard's decisions are deliberately asymmetric, and both live here so
+the asymmetry reads in one place. Exceeding the size limit is a *failure* — it
+raises `ValidationError`. Empty or whitespace-only input is a *result* — "the
+user typed nothing" is an ordinary outcome, so it resolves to an empty match
+report rather than raising, and the guard says so via `is_blank` for the
+pipeline to short-circuit on.
 """
 
 from __future__ import annotations
@@ -39,3 +46,14 @@ def check_prompt(prompt: str) -> str:
             field="prompt",
         )
     return prompt
+
+
+def is_blank(prompt: str) -> bool:
+    """Whether a prompt is empty or only whitespace — a defined empty result.
+
+    Empty and whitespace-only input are treated identically, so a caller never
+    has to pre-trim: "the user typed nothing" resolves to an empty match report,
+    not a failure. Whitespace is judged by `str.strip()`, which covers spaces,
+    tabs, newlines, and Unicode whitespace alike.
+    """
+    return not prompt.strip()

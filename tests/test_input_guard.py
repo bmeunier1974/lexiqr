@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 
 from lexiqr import EntityResolver, ValidationError
-from lexiqr.guard import MAX_PROMPT_LENGTH, check_prompt
+from lexiqr.guard import MAX_PROMPT_LENGTH, check_prompt, is_blank
 
 FIXTURE_PATH = (
     Path(__file__).resolve().parent.parent / "examples" / "flooff.lexicon.json"
@@ -45,6 +45,29 @@ def test_an_ordinary_prompt_passes_through_the_guard_untouched() -> None:
     assert check_prompt("wo ist flooff") == "wo ist flooff"
 
 
+# --- Empty and whitespace-only input: a defined, ordinary result, not a fault.
+# --- These decisions live in the guard alongside the size limit, so the whole
+# --- "what does the pipeline accept" policy reads in one place.
+
+
+@pytest.mark.parametrize(
+    "prompt",
+    [
+        "",  # empty
+        "   ",  # spaces
+        "\t\n\r",  # tabs and newlines
+        "  ",  # non-breaking space, em space (Unicode whitespace)
+    ],
+)
+def test_empty_and_whitespace_only_prompts_are_blank(prompt: str) -> None:
+    assert is_blank(prompt) is True
+
+
+@pytest.mark.parametrize("prompt", ["wo ist flooff", " x ", " a "])
+def test_a_prompt_with_any_non_whitespace_is_not_blank(prompt: str) -> None:
+    assert is_blank(prompt) is False
+
+
 # --- The guard, seen through the public API: proof it is wired in ahead of
 # --- matching, not merely available as a module.
 
@@ -65,6 +88,27 @@ def test_the_guard_runs_before_matching_even_when_the_prompt_would_match() -> No
 
     with pytest.raises(ValidationError):
         resolver.transform(oversized, "de-DE")
+
+
+@pytest.mark.parametrize("prompt", ["", "   ", "\t\n", " "])
+def test_transform_returns_an_empty_report_for_blank_input(prompt: str) -> None:
+    resolver = EntityResolver.from_file(FIXTURE_PATH)
+
+    report = resolver.transform(prompt, "de-DE")
+
+    assert report.matches == ()
+    assert report.prompt == prompt
+    assert report.locale == "de-DE"
+
+
+def test_whitespace_only_input_is_treated_exactly_like_empty_input() -> None:
+    resolver = EntityResolver.from_file(FIXTURE_PATH)
+
+    empty = resolver.transform("", "de-DE")
+    whitespace = resolver.transform("   ", "de-DE")
+
+    assert empty.matches == whitespace.matches == ()
+    assert empty.locale == whitespace.locale
 
 
 def test_a_prompt_just_under_the_limit_still_resolves_with_valid_spans() -> None:
