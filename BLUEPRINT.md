@@ -75,7 +75,7 @@ Status lifecycle: `mapped → planned → epic → shipped`.
 | C2 — init from lexicon data | core | [002](docs/plans/002-foundations.md) | [lexiqr#2](https://github.com/bmeunier1974/lexiqr/issues/2) | epic |
 | C3 — precise validation errors | core | [002](docs/plans/002-foundations.md) | [lexiqr#2](https://github.com/bmeunier1974/lexiqr/issues/2) | epic |
 | C4 — transform() match report | core | [003](docs/plans/003-exact-matching.md) | [lexiqr#3](https://github.com/bmeunier1974/lexiqr/issues/3) | epic |
-| C5 — typo-tolerant matching | core | [004](docs/plans/004-fuzzy-matching.md) | [lexiqr#4](https://github.com/bmeunier1974/lexiqr/issues/4) | epic |
+| C5 — typo-tolerant matching | core | [004](docs/plans/004-fuzzy-matching.md) | [lexiqr#4](https://github.com/bmeunier1974/lexiqr/issues/4) | shipped |
 | C6 — locale fallback chain | core | [005](docs/plans/005-locale-fallback.md) | [lexiqr#5](https://github.com/bmeunier1974/lexiqr/issues/5) | epic |
 | C7 — accent/script handling | core | [003](docs/plans/003-exact-matching.md) | [lexiqr#3](https://github.com/bmeunier1974/lexiqr/issues/3) | epic |
 | C8 — bounded adversarial input | core | [007](docs/plans/007-hardening.md) | [lexiqr#7](https://github.com/bmeunier1974/lexiqr/issues/7) | epic |
