@@ -18,11 +18,29 @@ raises `ValidationError`. Empty or whitespace-only input is a *result* — "the
 user typed nothing" is an ordinary outcome, so it resolves to an empty match
 report rather than raising, and the guard says so via `is_blank` for the
 pipeline to short-circuit on.
+
+Adversarial Unicode is *bounded and rejected, never sanitized*. The size limit
+already bounds the work a combining-character flood, bidi-control run, or
+astral-plane blob can cost, and because the guard hands the text on unchanged,
+bidi controls and astral characters resolve predictably rather than distorting
+what matches. The one class the guard actively rejects is a lone surrogate: a
+malformed code point that cannot be encoded to UTF-8, and so must fail at the
+boundary rather than propagate into a report that could never be serialized.
 """
 
 from __future__ import annotations
 
+import re
+
 from lexiqr.errors import ValidationError
+
+#: A lone surrogate — any code point in U+D800..U+DFFF standing on its own. A
+#: well-formed Python `str` never holds a *paired* surrogate (astral characters
+#: are single code points), so a surrogate found here is always malformed: it
+#: cannot be encoded to UTF-8, which means it could never be serialized, stored,
+#: or round-tripped. The guard rejects it at the boundary rather than letting
+#: bad bytes reach a report that downstream code then cannot handle.
+_LONE_SURROGATE = re.compile("[\ud800-\udfff]")
 
 #: The maximum prompt length lexiqr accepts, in Unicode code points. This is a
 #: documented part of the contract, not a per-call argument or a configuration
@@ -43,6 +61,14 @@ def check_prompt(prompt: str) -> str:
         raise ValidationError(
             f"Prompt exceeds the maximum length of {MAX_PROMPT_LENGTH} "
             f"characters (got {len(prompt)}).",
+            field="prompt",
+        )
+    surrogate = _LONE_SURROGATE.search(prompt)
+    if surrogate is not None:
+        raise ValidationError(
+            f"Prompt contains a lone surrogate (U+{ord(surrogate.group()):04X}) at "
+            f"position {surrogate.start()}; such malformed code points cannot be "
+            f"encoded and are rejected at the input boundary.",
             field="prompt",
         )
     return prompt

@@ -68,6 +68,43 @@ def test_a_prompt_with_any_non_whitespace_is_not_blank(prompt: str) -> None:
     assert is_blank(prompt) is False
 
 
+# --- Lone surrogates: malformed code points that cannot be encoded to UTF-8.
+# --- The guard rejects them at the boundary rather than letting them propagate
+# --- into a report that could never be serialized or stored.
+
+
+@pytest.mark.parametrize(
+    "prompt",
+    [
+        "\ud800",  # lone high surrogate, alone
+        "wo ist \ud800 flooff",  # embedded in otherwise-fine text
+        "\udfff",  # lone low surrogate
+        "flooff\udc00",  # trailing
+    ],
+)
+def test_a_prompt_containing_a_lone_surrogate_is_rejected(prompt: str) -> None:
+    with pytest.raises(ValidationError) as caught:
+        check_prompt(prompt)
+
+    assert caught.value.field == "prompt"
+
+
+@pytest.mark.parametrize(
+    "prompt",
+    [
+        "a" + "́" * 500,  # combining-character flood
+        "‮wo ist flooff‬",  # bidi override characters
+        "wo ist flooff \U0001f600\U0001f389",  # astral-plane emoji
+        "wo ist \U00010330 flooff",  # astral-plane rare script
+    ],
+)
+def test_surrogate_free_adversarial_text_is_accepted_unchanged(prompt: str) -> None:
+    # The guard bounds and rejects; it never mangles. Anything that is not a
+    # lone surrogate or over the size limit passes through untouched, so spans
+    # keep indexing the original prompt and normalization policy is unchanged.
+    assert check_prompt(prompt) == prompt
+
+
 # --- The guard, seen through the public API: proof it is wired in ahead of
 # --- matching, not merely available as a module.
 
