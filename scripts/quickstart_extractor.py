@@ -18,6 +18,8 @@ extractor mistaking one for the other. The directives:
                                    unit just before it
     <!-- quickstart:file PATH -->  the next block is written to PATH, so a unit
                                    can reference it (the inline lexicon)
+    <!-- quickstart:skip -->       the next block is explicitly illustrative and
+                                   collected as nothing (the multi-tenant recipe)
 
 A README that marks nothing executable raises rather than returning an empty
 collection: a quickstart that silently tests nothing is worse than one that
@@ -130,6 +132,13 @@ def _apply_directive(
                 "<!-- quickstart:file lexicon.json -->"
             )
         files.append(MaterializedFile(path=path, content=body))
+        return
+
+    if kind == "skip":
+        # Explicitly illustrative: a block that says "do not run me", so
+        # aspirational or partial snippets (the multi-tenant recipe) can be
+        # marked non-executable rather than merely left unmarked, and cannot be
+        # collected by accident.
         return
 
     if kind == "expected":

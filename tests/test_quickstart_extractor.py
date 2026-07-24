@@ -53,6 +53,24 @@ def test_unmarked_blocks_are_illustrative_and_excluded() -> None:
     assert "lexiqr try" in quickstart.units[0].code
 
 
+def test_a_skip_directive_marks_a_block_illustrative_and_collects_nothing() -> None:
+    # An explicitly non-executable block (e.g. the multi-tenant recipe) sits in
+    # the same README as tested ones without being run and without tripping the
+    # extractor's unknown-directive guard.
+    markdown = (
+        "<!-- quickstart:python -->\n"
+        "```python\nprint('run me')\n```\n"
+        "\n"
+        "<!-- quickstart:skip -->\n"
+        "```python\naspirational_code_that_is_never_run()\n```\n"
+    )
+
+    quickstart = extract_quickstart(markdown)
+
+    assert len(quickstart.units) == 1
+    assert "run me" in quickstart.units[0].code
+
+
 def test_markdown_with_no_executable_blocks_raises() -> None:
     markdown = (
         "# Title\n\nProse only, plus an illustrative block:\n\n"

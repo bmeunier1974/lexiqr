@@ -36,3 +36,9 @@ down under a new `## [x.y.z]` heading dated on the day it ships.
 - Executable README quickstart: the founding flooff story for both actors runs
   in CI (`tests/test_readme_quickstart.py`) against the README's own inline
   lexicon, so the front page cannot drift from the shipped API.
+- Release documentation on the README: the semver-governed surface named
+  explicitly (public API, error types, report types, canonical serialization),
+  supported Python versions, a CHANGELOG link, a CI status badge, and an
+  illustrative multi-tenant tenant→resolver recipe (marked non-executable).
+- Quickstart extractor: a `<!-- quickstart:skip -->` directive to mark a block
+  explicitly illustrative so it is never collected as a runnable unit.

@@ -1,5 +1,7 @@
 # lexiqr
 
+[![CI](https://github.com/bmeunier1974/lexiqr/actions/workflows/ci.yml/badge.svg)](https://github.com/bmeunier1974/lexiqr/actions/workflows/ci.yml)
+
 **lexiqr** is a deterministic Python library for B2B SaaS backend teams whose tenants each speak their own private language. A tenant defines a multilingual lexicon mapping their company jargon ("flooff") to canonical database entities ("product"); lexiqr initializes from that lexicon and transforms free-form prompts into entity-identified prompt objects — exact and typo-tolerant matches with character spans, scores, and corrections.
 
 Where teams today hardcode synonym tables, retrain embeddings, or let an LLM guess, lexiqr is a pip-installable resolution layer that is **deterministic, explainable, and tenant-scoped**.
@@ -119,6 +121,58 @@ lexiqr is built to sit in a request path, so its performance is a stated, CI-enf
 **How it is measured** (so you can reproduce it): initialization is timed cold — one resolver built once, nothing warmed. `transform()` p95 excludes warm-up — a fixed set of warm-up calls is discarded, then p95 is taken over a fixed number of timed iterations against the benchmark lexicon. A long-but-under-limit prompt is measured too, so the 10,000-character size limit is the only performance cliff, not a hidden one before it.
 
 **The gate vs. the guarantee.** The numbers above are the guarantee. The CI perf gate asserts the envelope multiplied by a **3× headroom factor** (p95 < 30 ms, init < 3 s) on a single fixed runner: shared CI runners are noisy, and the headroom turns that noise into a re-run rather than a false failure. A change has to make matching roughly an order of magnitude slower to trip the gate — catching subtle drift is not its job, which is why the raw timings are also recorded, un-gated, on every run.
+
+## Versioning and compatibility
+
+lexiqr runs on **Python 3.10, 3.11, 3.12, and 3.13**, and follows
+[Semantic Versioning](https://semver.org/spec/v2.0.0.html). A stored snapshot or
+a version constraint is only as trustworthy as the surface the promise covers, so
+that surface is named explicitly. Semver governs:
+
+- **The public API** — everything exported from the `lexiqr` package:
+  `EntityResolver` and its `from_file` / `from_dict` / `transform` methods,
+  including the `fuzzy` keyword.
+- **The structured error types** — `ValidationError` and its coordinates
+  (`canonical_id`, `locale`, `field`), which the CLI renders verbatim.
+- **The match report types** — `MatchReport`, `EntityMatch`, and `ScoreTier`,
+  and the fields a caller reads off them (span, tier, correction).
+- **The canonical report serialization** — the byte-level shape produced by
+  `serialize_report` and consumed by `deserialize_report`.
+
+A breaking change to any of these is a major-version change. Everything else —
+internal modules, private helpers, log wording — can change in a patch. Read the
+[CHANGELOG](CHANGELOG.md) before upgrading; every release documents what changed.
+
+## Multi-tenant use
+
+lexiqr resolves one tenant's lexicon per resolver, and deliberately ships **no**
+tenant registry — mapping tenants to resolvers is your composition, not lexiqr's,
+so it stays a thin layer you control. The recipe is a cache of resolvers keyed by
+tenant, each built once from that tenant's lexicon:
+
+<!-- quickstart:skip -->
+```python
+# Illustrative recipe — not run in CI. Adapt the loader and cache to your stack.
+from functools import lru_cache
+from pathlib import Path
+
+from lexiqr import EntityResolver, MatchReport
+
+
+@lru_cache(maxsize=None)
+def resolver_for(tenant_id: str) -> EntityResolver:
+    """One resolver per tenant, built once and reused across requests."""
+    lexicon = Path("lexicons") / f"{tenant_id}.lexicon.json"
+    return EntityResolver.from_file(lexicon)
+
+
+def resolve(tenant_id: str, prompt: str, locale: str) -> MatchReport:
+    return resolver_for(tenant_id).transform(prompt, locale)
+```
+
+Because a resolver is built once and then only read, one instance per tenant is
+safe to share across requests; size the cache to your tenant count, or swap
+`lru_cache` for whatever eviction your deployment already uses.
 
 ## This repository
 
