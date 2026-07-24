@@ -23,6 +23,8 @@ dependencies = ["rapidfuzz>=3.0"]
 [project.urls]
 Homepage = "https://github.com/bmeunier1974/lexiqr"
 Repository = "https://github.com/bmeunier1974/lexiqr"
+Issues = "https://github.com/bmeunier1974/lexiqr/issues"
+Changelog = "https://github.com/bmeunier1974/lexiqr/blob/main/CHANGELOG.md"
 
 [project.scripts]
 lexiqr = "lexiqr.cli:main"
@@ -33,6 +35,14 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/lexiqr"]
+
+# The versioned lexicon schema lives at the repo root (single source of truth,
+# shared with the offline-authoring workflow), but it must also ship inside the
+# wheel so an integrating developer has the lexicon format alongside the code.
+# force-include maps that one file into the package; the fixtures and the
+# publication record stay out — they are dev/CI artifacts, not runtime contract.
+[tool.hatch.build.targets.wheel.force-include]
+"schema/lexicon.v1.schema.json" = "lexiqr/schema/lexicon.v1.schema.json"
 
 [dependency-groups]
 dev = [
