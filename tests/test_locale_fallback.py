@@ -364,3 +364,65 @@ def test_adding_the_matching_variant_takes_precedence_for_its_own_prompts() -> N
         with_ch.transform("die rechnung bitte", "de-CH").matches[0].matched_locale
         == "de-CH"
     )
+
+
+# --- Fallback composes with the fuzzy pass (story #40) ----------------------
+
+
+def test_a_misspelled_form_in_a_fallback_locale_resolves_with_its_correction() -> None:
+    # product/'flooff' is authored only in de-DE; a misspelled de-AT prompt
+    # resolves through the de-DE fallback, carrying its correction.
+    resolver = EntityResolver.from_dict(_de_variants())
+
+    report = resolver.transform("wo ist floof", "de-AT")
+
+    match = report.matches[0]
+    assert match.canonical_id == "product"
+    assert match.surface_form == "flooff"
+    assert match.correction == "floof"
+    assert match.matched_locale == "de-DE"
+    assert report.locale == "de-DE"
+
+
+def test_an_earlier_fuzzy_match_beats_a_later_exact_match() -> None:
+    # de-AT (earlier) fuzzy-matches the typed word; de-DE (later) would match it
+    # exactly. Chain position is decided before match quality, so de-AT wins.
+    lexicon = {
+        "schemaVersion": "1",
+        "defaultLocale": "de-DE",
+        "entities": {
+            "product": {
+                "locales": {
+                    "de-AT": {"preferred": {"singular": "flooof"}},
+                    "de-DE": {"preferred": {"singular": "flooff"}},
+                }
+            }
+        },
+    }
+
+    report = EntityResolver.from_dict(lexicon).transform("wo ist flooff", "de-AT")
+
+    match = report.matches[0]
+    assert match.matched_locale == "de-AT"
+    assert match.surface_form == "flooof"
+    assert match.correction == "flooff"
+
+
+def test_matched_locale_names_the_fallback_that_produced_the_correction() -> None:
+    resolver = EntityResolver.from_dict(_de_variants())
+
+    report = resolver.transform("wo ist floof", "fr-FR")
+
+    assert report.matches[0].correction == "floof"
+    assert report.matches[0].matched_locale == "de-DE"
+
+
+def test_with_fuzzy_off_fallback_still_resolves_exact_only() -> None:
+    resolver = EntityResolver.from_dict(_de_variants(), fuzzy=False)
+
+    exact = resolver.transform("wo ist flooff", "de-AT")
+    assert exact.matches[0].matched_locale == "de-DE"
+    assert exact.matches[0].correction is None
+
+    misspelled = resolver.transform("wo ist floof", "de-AT")
+    assert misspelled.matches == ()
