@@ -34,33 +34,20 @@ uv run lexiqr try examples/flooff.lexicon.json --locale de-DE "wo ist flooff"
 
 ## Releasing
 
+The full step-by-step checklist — including the human judgments CI cannot make —
+lives in [RELEASING.md](RELEASING.md). The summary:
+
 Releases are cut by pushing a semver tag; `.github/workflows/release.yml` builds
 the wheel and sdist, publishes them, then installs the published package into a
 clean virtualenv and reproduces the flooff match. A release that cannot be
 installed and reproduced fails.
 
 ```bash
-git tag v0.0.1 && git push origin v0.0.1
+git tag vX.Y.Z && git push origin vX.Y.Z
 ```
 
-Publishing currently targets **TestPyPI**; the switch to real PyPI is a one-line
-change to `repository-url`, made once the pipe is proven.
-
-### One-time prerequisite: register the pending publisher
-
-**Before the first tag push**, the maintainer must register a *pending publisher*
-on TestPyPI, or the publish step is rejected. This is configuration, not code —
-it is done once, by hand, in the TestPyPI web UI
-(<https://test.pypi.org/manage/account/publishing/>):
-
-| Field | Value |
-|-------|-------|
-| PyPI Project Name | `lexiqr` |
-| Owner | `bmeunier1974` |
-| Repository name | `lexiqr` |
-| Workflow name | `release.yml` |
-| Environment name | `testpypi` |
-
-Trusted publishing means no long-lived token ever exists in the repository or
-its secrets: the workflow exchanges a short-lived OIDC token for upload rights
-(ADR 0004).
+Publishing targets **real PyPI** via trusted publishing — no long-lived token
+ever exists in the repository or its secrets; the workflow exchanges a
+short-lived OIDC token for upload rights (ADR 0004). The one-time pending-publisher
+registration and every human prerequisite of the `v1.0.0` tag — including the
+[HERITAGE.md](HERITAGE.md) clean-room note — are in [RELEASING.md](RELEASING.md).

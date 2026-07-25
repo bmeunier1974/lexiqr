@@ -1,15 +1,16 @@
 name: Release
 
-# Pushing a v* tag builds the distributions, publishes them to TestPyPI via
-# trusted publishing (no long-lived credentials anywhere — ADR 0004), then
-# proves the release by installing it from TestPyPI and reproducing the flooff
-# match. The flip from TestPyPI to PyPI is a one-line change, made once the
-# pipe is proven.
+# Pushing a v* tag runs the consistency gate, builds the distributions,
+# publishes them to real PyPI via trusted publishing (no long-lived credentials
+# anywhere — ADR 0004), then proves the release by installing it from PyPI into
+# a clean virtualenv and reproducing the flooff match. This is the flip the
+# walking skeleton de-risked against TestPyPI: the target changed, the shape did
+# not.
 #
 # Maintainer prerequisite, once, before the first tag push: register the
-# pending publisher on TestPyPI (project `lexiqr`, owner `bmeunier1974`,
-# repository `lexiqr`, workflow `release.yml`). Without it the publish step is
-# rejected. See CONTRIBUTING.md → Releasing.
+# pending publisher on PyPI (project `lexiqr`, owner `bmeunier1974`, repository
+# `lexiqr`, workflow `release.yml`, environment `pypi`). Without it the publish
+# step is rejected. See RELEASING.md.
 
 on:
   push:
@@ -17,8 +18,27 @@ on:
       - "v*"
 
 jobs:
+  consistency:
+    # The gate runs first and alone: the tag, the package's declared version,
+    # and the changelog's top entry must agree, and that entry must be
+    # non-empty. A mismatch fails here — in seconds, before a wheel is built or a
+    # version number is burned — with a message naming which of the three
+    # disagreed. Pure stdlib, no build step; see scripts/release_consistency.py.
+    name: Release-consistency gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Check tag / version / changelog agree
+        run: python scripts/release_consistency.py "${GITHUB_REF_NAME}"
+
   build:
     name: Build wheel + sdist
+    needs: consistency
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -35,10 +55,10 @@ jobs:
           path: dist/
 
   publish:
-    name: Publish to TestPyPI
+    name: Publish to PyPI
     needs: build
     runs-on: ubuntu-latest
-    environment: testpypi
+    environment: pypi
     permissions:
       id-token: write # the OIDC token trusted publishing exchanges for an upload token
     steps:
@@ -49,11 +69,16 @@ jobs:
 
       - name: Publish via trusted publishing
         uses: pypa/gh-action-pypi-publish@release/v1
+        # No repository-url: the default target is real PyPI. No token anywhere —
+        # the id-token permission above is the only credential.
         with:
-          repository-url: https://test.pypi.org/legacy/
+          # A version already on PyPI must fail the release, not be silently
+          # skipped into a confusing partial state: PyPI versions are immutable,
+          # so a re-run means bumping the version, not re-uploading.
+          skip-existing: false
 
   verify:
-    name: Install from TestPyPI and reproduce the flooff match
+    name: Install from PyPI and reproduce the flooff match
     needs: publish
     runs-on: ubuntu-latest
     steps:
@@ -68,22 +93,35 @@ jobs:
           set -euo pipefail
           version="${GITHUB_REF_NAME#v}"
           python -m venv /tmp/clean-venv
-          # TestPyPI serves lexiqr; rapidfuzz still comes from the real index.
+          # Install from real PyPI (the default index). A freshly-published
+          # version can take a moment to propagate to the index, so retry rather
+          # than assume it is immediately installable.
+          installed=""
           for attempt in 1 2 3 4 5; do
             if /tmp/clean-venv/bin/pip install \
-                 --index-url https://test.pypi.org/simple/ \
-                 --extra-index-url https://pypi.org/simple/ \
+                 --index-url https://pypi.org/simple/ \
                  "lexiqr==${version}"; then
-              exit 0
+              installed="yes"
+              break
             fi
-            echo "TestPyPI has not served ${version} yet; retrying in 30s (attempt ${attempt})"
+            echo "PyPI has not served ${version} yet; retrying in 30s (attempt ${attempt})"
             sleep 30
           done
-          echo "lexiqr==${version} never became installable from TestPyPI"
-          exit 1
+          if [ -z "${installed}" ]; then
+            echo "lexiqr==${version} never became installable from PyPI"
+            exit 1
+          fi
 
       - name: Confirm the install pulled in rapidfuzz and nothing else
         run: /tmp/clean-venv/bin/pip list
 
       - name: Reproduce the flooff match from the installed package
         run: /tmp/clean-venv/bin/python scripts/reproduce_flooff.py
+
+      - name: Confirm the lexiqr console entry point is callable
+        run: |
+          set -euo pipefail
+          # The CLI must be on PATH after a plain install, with no separate step.
+          /tmp/clean-venv/bin/lexiqr validate examples/flooff.lexicon.json
+          /tmp/clean-venv/bin/lexiqr try examples/flooff.lexicon.json \
+            --locale de-DE "wo ist flooff"

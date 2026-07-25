@@ -1,28 +1,94 @@
 # lexiqr
 
+[![CI](https://github.com/bmeunier1974/lexiqr/actions/workflows/ci.yml/badge.svg)](https://github.com/bmeunier1974/lexiqr/actions/workflows/ci.yml)
+
 **lexiqr** is a deterministic Python library for B2B SaaS backend teams whose tenants each speak their own private language. A tenant defines a multilingual lexicon mapping their company jargon ("flooff") to canonical database entities ("product"); lexiqr initializes from that lexicon and transforms free-form prompts into entity-identified prompt objects — exact and typo-tolerant matches with character spans, scores, and corrections.
 
 Where teams today hardcode synonym tables, retrain embeddings, or let an LLM guess, lexiqr is a pip-installable resolution layer that is **deterministic, explainable, and tenant-scoped**.
+
+## Quickstart
+
+Install it:
 
 ```bash
 pip install lexiqr
 ```
 
+A lexicon maps one tenant's private jargon to canonical entities. Here a German
+tenant maps **flooff** to the `product` entity — this is the file the examples
+below run against:
+
+<!-- quickstart:file lexicon.json -->
+```json
+{
+  "schemaVersion": "1",
+  "defaultLocale": "de-DE",
+  "entities": {
+    "product": {
+      "locales": {
+        "de-DE": { "preferred": { "singular": "flooff" } }
+      }
+    }
+  }
+}
+```
+
+Resolve a prompt in Python. Typo tolerance is on by default, so the typo
+`floof` still resolves and the match carries a correction naming what was typed:
+
+<!-- quickstart:python -->
 ```python
 from lexiqr import EntityResolver
 
 resolver = EntityResolver.from_file("lexicon.json")
-report = resolver.transform("wo ist flooff", locale="de-DE")
-# → one match: entity "product", surface "flooff", span (7, 13), tier "preferred"
 
-# Typo tolerance is on by default: "floof" still resolves, and the match carries
-# a correction naming what was typed. Pass fuzzy=False for exact-only behaviour.
-exact_only = EntityResolver.from_file("lexicon.json", fuzzy=False)
+# "flooff" resolves to the product entity, with its character span and tier.
+match = resolver.transform("wo ist flooff", locale="de-DE").matches[0]
+print(f"{match.canonical_id} <- {match.surface_form!r} at {match.span}, tier {match.score_tier.value}")
+
+# The typo "floof" still resolves; the match names what was typed.
+typo = resolver.transform("wo ist floof", locale="de-DE").matches[0]
+print(f"corrected {typo.correction!r} -> {typo.surface_form!r}")
 ```
 
-The `fuzzy` keyword — accepted by `EntityResolver(...)`, `from_file`, and `from_dict`, defaulting to `True` — is public, semver-governed API.
+<!-- quickstart:expected -->
+```text
+product <- 'flooff' at (7, 13), tier preferred
+corrected 'floof' -> 'flooff'
+```
 
-> **Status:** pre-1.0 — under active development. The API above is the target contract.
+Lexicon authors don't need Python: the same lexicon checks and runs from the
+command line. `lexiqr validate` confirms the file is well-formed —
+
+<!-- quickstart:shell -->
+```bash
+lexiqr validate lexicon.json
+```
+
+<!-- quickstart:expected -->
+```text
+lexicon.json: valid lexicon.
+```
+
+— and `lexiqr try` resolves a prompt against it, showing the same match the
+developer sees:
+
+<!-- quickstart:shell -->
+```bash
+lexiqr try lexicon.json --locale de-DE "wo ist flooff"
+```
+
+<!-- quickstart:expected -->
+```text
+prompt: "wo ist [flooff]"
+resolved via: de-DE
+1 match:
+
+  [1] product ← "flooff"
+      tier: preferred   locale: de-DE   text: "flooff"
+```
+
+The `fuzzy` keyword — accepted by `EntityResolver(...)`, `from_file`, and `from_dict`, defaulting to `True` — is public, semver-governed API; pass `fuzzy=False` for exact-only behaviour.
 
 ## Input limits
 
@@ -53,6 +119,58 @@ lexiqr is built to sit in a request path, so its performance is a stated, CI-enf
 **How it is measured** (so you can reproduce it): initialization is timed cold — one resolver built once, nothing warmed. `transform()` p95 excludes warm-up — a fixed set of warm-up calls is discarded, then p95 is taken over a fixed number of timed iterations against the benchmark lexicon. A long-but-under-limit prompt is measured too, so the 10,000-character size limit is the only performance cliff, not a hidden one before it.
 
 **The gate vs. the guarantee.** The numbers above are the guarantee. The CI perf gate asserts the envelope multiplied by a **3× headroom factor** (p95 < 30 ms, init < 3 s) on a single fixed runner: shared CI runners are noisy, and the headroom turns that noise into a re-run rather than a false failure. A change has to make matching roughly an order of magnitude slower to trip the gate — catching subtle drift is not its job, which is why the raw timings are also recorded, un-gated, on every run.
+
+## Versioning and compatibility
+
+lexiqr runs on **Python 3.10, 3.11, 3.12, and 3.13**, and follows
+[Semantic Versioning](https://semver.org/spec/v2.0.0.html). A stored snapshot or
+a version constraint is only as trustworthy as the surface the promise covers, so
+that surface is named explicitly. Semver governs:
+
+- **The public API** — everything exported from the `lexiqr` package:
+  `EntityResolver` and its `from_file` / `from_dict` / `transform` methods,
+  including the `fuzzy` keyword.
+- **The structured error types** — `ValidationError` and its coordinates
+  (`canonical_id`, `locale`, `field`), which the CLI renders verbatim.
+- **The match report types** — `MatchReport`, `EntityMatch`, and `ScoreTier`,
+  and the fields a caller reads off them (span, tier, correction).
+- **The canonical report serialization** — the byte-level shape produced by
+  `serialize_report` and consumed by `deserialize_report`.
+
+A breaking change to any of these is a major-version change. Everything else —
+internal modules, private helpers, log wording — can change in a patch. Read the
+[CHANGELOG](CHANGELOG.md) before upgrading; every release documents what changed.
+
+## Multi-tenant use
+
+lexiqr resolves one tenant's lexicon per resolver, and deliberately ships **no**
+tenant registry — mapping tenants to resolvers is your composition, not lexiqr's,
+so it stays a thin layer you control. The recipe is a cache of resolvers keyed by
+tenant, each built once from that tenant's lexicon:
+
+<!-- quickstart:skip -->
+```python
+# Illustrative recipe — not run in CI. Adapt the loader and cache to your stack.
+from functools import lru_cache
+from pathlib import Path
+
+from lexiqr import EntityResolver, MatchReport
+
+
+@lru_cache(maxsize=None)
+def resolver_for(tenant_id: str) -> EntityResolver:
+    """One resolver per tenant, built once and reused across requests."""
+    lexicon = Path("lexicons") / f"{tenant_id}.lexicon.json"
+    return EntityResolver.from_file(lexicon)
+
+
+def resolve(tenant_id: str, prompt: str, locale: str) -> MatchReport:
+    return resolver_for(tenant_id).transform(prompt, locale)
+```
+
+Because a resolver is built once and then only read, one instance per tenant is
+safe to share across requests; size the cache to your tenant count, or swap
+`lru_cache` for whatever eviction your deployment already uses.
 
 ## This repository
 
@@ -92,6 +210,11 @@ uv run pytest    # the same suite CI runs on every push and pull request
 Release process and the one-time TestPyPI publisher registration live in
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
-## License
+## License and heritage
 
-MIT
+MIT — see [LICENSE](LICENSE).
+
+lexiqr's deterministic core is a clean-room reimplementation of a design first
+worked out on a private repository's branch 735: no branch-735 source was
+copied, only the documented design and the behavioral spec preserved here.
+[HERITAGE.md](HERITAGE.md) states the provenance position in full.
