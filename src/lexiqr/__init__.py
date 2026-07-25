@@ -18,14 +18,13 @@ load failure with no place in the document to name — the file is not JSON at a
 numbers rather than configuration, so a caller sizing input or generating labels
 reads the limit lexiqr actually enforces instead of copying it.
 
-Nothing behind these is public: fallback, guard, index, locale, matcher and
-normalizer stay internal, and can change in a patch.
+Nothing behind these is public: fallback, index, locale, matcher and normalizer
+stay internal, and can change in a patch.
 """
 
 from lexiqr.errors import MalformedDocumentError, ValidationError
-from lexiqr.guard import MAX_PROMPT_LENGTH
 from lexiqr.lexicon import MAX_SURFACE_FORM_LENGTH, Lexicon, SurfaceForms
-from lexiqr.resolver import EntityResolver
+from lexiqr.resolver import MAX_PROMPT_LENGTH, EntityResolver
 from lexiqr.serialization import deserialize_report, serialize_report
 from lexiqr.types import EntityMatch, MatchReport, ScoreTier
 

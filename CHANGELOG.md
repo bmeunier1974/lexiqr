@@ -46,8 +46,7 @@ ships; until then the top released entry below stays 1.0.0.
   wording, one code path (ADR 0002). CLI output and exit codes are unchanged.
 
 Additive only: no resolution behaviour changed, and nothing else became public
-— the fallback, guard, index, locale, matcher and normalizer machinery stays
-internal.
+— the fallback, index, locale, matcher and normalizer machinery stays internal.
 
 ## [1.0.0] - 2026-07-24
 
