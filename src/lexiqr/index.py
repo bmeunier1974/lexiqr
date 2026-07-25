@@ -25,10 +25,13 @@ from lexiqr.lexicon import Lexicon, SurfaceForms
 from lexiqr.normalizer import normalize_text
 from lexiqr.types import ScoreTier
 
-#: A surface form only counts when it stands as a word. Without this, "ticket"
-#: matches inside "tickets" and a tenant's short label matches inside half the
-#: prompt.
-_WORD = re.compile(r"\w")
+#: What counts as a word character — the one rule both passes obey, stated here
+#: because the exact scan is what makes it observable. A surface form only counts
+#: when it stands as a word: without this, "ticket" matches inside "tickets" and
+#: a tenant's short label matches inside half the prompt. The matcher's fuzzy
+#: pass cuts its residue into runs of the same class, so the words tolerance
+#: examines are exactly the words the scan required to stand alone.
+WORD_CHARACTER = re.compile(r"\w")
 
 
 @dataclass(frozen=True)
@@ -211,4 +214,4 @@ def _outputs(node: _Node) -> list[tuple[int, str, str, ScoreTier]]:
 def _stands_alone(text: str, start: int, end: int) -> bool:
     before = text[start - 1] if start > 0 else ""
     after = text[end] if end < len(text) else ""
-    return not _WORD.match(before) and not _WORD.match(after)
+    return not WORD_CHARACTER.match(before) and not WORD_CHARACTER.match(after)

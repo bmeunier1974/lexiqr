@@ -128,20 +128,28 @@ def test_the_report_is_ordered_by_position_not_by_tier() -> None:
 
 
 def test_an_exact_hit_outranks_an_overlapping_fuzzy_hit_even_a_longer_one() -> None:
-    """The one new dimension: kind is asked before span length.
+    """Kind is asked before span length — the one rule pinned from inside.
 
-    A correctly spelled word must never be displaced by a fuzzy guess, so where
-    the two kinds claim overlapping text the exact hit wins outright — even when
-    the fuzzy hit spans more of the prompt.
+    Reaching into the matcher is deliberate here, and it is the only place in
+    the suite that does it. The rule guards a case no lexicon and prompt can
+    produce: the fuzzy pass already skips every word an exact hit covered, so an
+    overlapping pair of the two kinds never reaches the resolver through
+    `transform`. That pre-filter is a cost optimization; this rule is the
+    guarantee — a correctly spelled word is never displaced by a guess — and a
+    guarantee that is only ever exercised by the optimization that makes it
+    unnecessary is untested. So the claims are handed to the resolver directly.
     """
-    from lexiqr.overlaps import Candidate, resolve
+    from lexiqr.index import Hit
+    from lexiqr.matcher import _Claim, _resolve
 
-    exact = Candidate("product", "widget", (4, 10), ScoreTier.CANONICAL, is_fuzzy=False)
-    longer_fuzzy = Candidate(
-        "gadget", "gadgetry", (0, 12), ScoreTier.PREFERRED, is_fuzzy=True
+    exact = _Claim(
+        Hit("product", "widget", (4, 10), ScoreTier.CANONICAL), is_fuzzy=False
+    )
+    longer_fuzzy = _Claim(
+        Hit("gadget", "gadgetry", (0, 12), ScoreTier.PREFERRED), is_fuzzy=True
     )
 
-    assert resolve((longer_fuzzy, exact)) == (exact,)
+    assert _resolve((longer_fuzzy, exact)) == (exact,)
 
 
 def test_a_correctly_spelled_and_a_misspelled_term_both_resolve() -> None:

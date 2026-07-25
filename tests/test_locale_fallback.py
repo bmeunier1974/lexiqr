@@ -13,8 +13,7 @@ from typing import Any
 
 import pytest
 
-from lexiqr import EntityResolver
-from lexiqr.errors import ValidationError
+from lexiqr import EntityResolver, ValidationError
 from lexiqr.fallback import build_chain, resolve_explicit_chain
 
 MEDIEN_DE = (

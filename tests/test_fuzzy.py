@@ -317,13 +317,25 @@ def test_an_ambiguous_typo_returns_the_same_correction_on_every_run() -> None:
 
 
 def test_the_fuzzy_pass_is_isolated_no_similarity_reasoning_leaks_elsewhere() -> None:
+    """Similarity reasoning lives in the matcher and nowhere else in core.
+
+    The fuzzy pass is one stage of the match pass rather than its own module,
+    so isolation is now a claim about a single file: the matcher imports
+    rapidfuzz, and no other module in the package mentions it — not the index,
+    not the resolver, not the normalizer. A tolerance regression therefore has
+    exactly one place to be.
+    """
     import lexiqr
 
     package = Path(lexiqr.__file__).resolve().parent
 
-    assert "rapidfuzz" in (package / "fuzzy.py").read_text(encoding="utf-8")
-    for module in ("matcher.py", "resolver.py", "overlaps.py", "index.py"):
-        assert "rapidfuzz" not in (package / module).read_text(encoding="utf-8")
+    mentions = {
+        module.relative_to(package).as_posix()
+        for module in package.rglob("*.py")
+        if "rapidfuzz" in module.read_text(encoding="utf-8")
+    }
+
+    assert mentions == {"matcher.py"}
 
 
 def test_rapidfuzz_remains_the_only_runtime_dependency() -> None:
