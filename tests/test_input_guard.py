@@ -11,8 +11,8 @@ from pathlib import Path
 
 import pytest
 
-from lexiqr import EntityResolver, ValidationError
-from lexiqr.guard import MAX_PROMPT_LENGTH, check_prompt, is_blank
+from lexiqr import MAX_PROMPT_LENGTH, EntityResolver, ValidationError
+from lexiqr.guard import check_prompt, is_blank
 
 FIXTURE_PATH = (
     Path(__file__).resolve().parent.parent / "examples" / "flooff.lexicon.json"

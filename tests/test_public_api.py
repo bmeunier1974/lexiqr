@@ -1,10 +1,52 @@
-"""The public API surface: `from lexiqr import EntityResolver` (ADR 0002).
+"""The public API surface — everything `from lexiqr import …` may name (ADR 0002).
 
-Everything named here is semver-governed. A name that leaves this list, or
-changes shape, is a breaking release.
+The resolution path (`EntityResolver` and the report types), the lexicon model
+that path takes, and the two documented limits. Every name here is
+semver-governed: one that leaves the list, or changes shape, is a breaking
+release.
+
+`PUBLIC_SURFACE` below is the tripwire: it is written out by hand, so widening
+the surface is a decision someone takes in this file, and any name that reaches
+`lexiqr.__all__` without being written here fails as the accidental export it is.
 """
 
+from pathlib import Path
+
+import pytest
+
 import lexiqr
+
+FLOOFF = Path(__file__).resolve().parent.parent / "examples" / "flooff.lexicon.json"
+
+#: Every name lexiqr exports, and nothing else. Adding one is a minor release;
+#: removing or reshaping one is a major release (README → Versioning and
+#: compatibility).
+PUBLIC_SURFACE = {
+    "EntityMatch",
+    "EntityResolver",
+    "Lexicon",
+    "MAX_PROMPT_LENGTH",
+    "MAX_SURFACE_FORM_LENGTH",
+    "MatchReport",
+    "ScoreTier",
+    "SurfaceForms",
+    "ValidationError",
+    "deserialize_report",
+    "serialize_report",
+}
+
+
+def test_the_public_surface_is_exactly_the_names_semver_governs() -> None:
+    assert set(lexiqr.__all__) == PUBLIC_SURFACE
+
+
+def test_every_exported_name_is_reachable_from_the_package_root() -> None:
+    """What a consumer's `from lexiqr import *` actually brings in: each name in
+    the list resolves, and nothing resolves that the list does not name."""
+    imported: dict[str, object] = {}
+    exec("from lexiqr import *", imported)
+
+    assert set(imported) - {"__builtins__"} == PUBLIC_SURFACE
 
 
 def test_entity_resolver_is_importable_from_the_package_root() -> None:
@@ -39,3 +81,71 @@ def test_coordinates_a_failure_does_not_have_are_none() -> None:
 
     assert error.canonical_id is None
     assert error.locale is None
+
+
+# --- The lexicon seam: `Lexicon` is the declared parameter type of the public
+# --- constructor, so an integrating developer must be able to hold one — and to
+# --- load and validate a tenant's file — without building a throwaway resolver.
+
+
+def test_a_lexicon_loads_and_validates_through_exported_names_alone() -> None:
+    from lexiqr import Lexicon, SurfaceForms
+
+    lexicon = Lexicon.from_file(FLOOFF)
+
+    assert lexicon.default_locale == "de-DE"
+    forms = lexicon.entities["product"]["de-DE"]
+    assert isinstance(forms, SurfaceForms)
+    assert forms.preferred_singular == "flooff"
+
+
+def test_loading_an_invalid_lexicon_faults_where_the_document_is_wrong() -> None:
+    """Validation is construction: `from_dict` is the validate-only workflow."""
+    from lexiqr import Lexicon, ValidationError
+
+    with pytest.raises(ValidationError) as raised:
+        Lexicon.from_dict({"schemaVersion": "99", "entities": {}})
+
+    assert raised.value.field == "schemaVersion"
+
+
+def test_a_resolver_is_built_from_a_lexicon_the_caller_already_holds() -> None:
+    from lexiqr import EntityResolver, Lexicon
+
+    resolver = EntityResolver(Lexicon.from_file(FLOOFF))
+
+    assert resolver.transform("wo ist flooff", "de-DE").matches[0].canonical_id == (
+        "product"
+    )
+
+
+# --- The two documented limits: fixed parts of the contract, not per-call
+# --- arguments or configuration knobs. Their values are what the README (prompt
+# --- length) and docs/lexicon-semantic-checks.md (surface-form length) state;
+# --- changing either is a semver-visible change, so both are pinned here.
+
+
+def test_the_documented_prompt_limit_is_a_public_constant() -> None:
+    from lexiqr import MAX_PROMPT_LENGTH
+
+    assert MAX_PROMPT_LENGTH == 10_000
+
+
+def test_the_documented_surface_form_limit_is_a_public_constant() -> None:
+    from lexiqr import MAX_SURFACE_FORM_LENGTH
+
+    assert MAX_SURFACE_FORM_LENGTH == 128
+
+
+@pytest.mark.parametrize(
+    "private",
+    ["check_prompt", "is_blank", "normalize_text", "build_chain", "scan"],
+)
+def test_no_private_machinery_rides_along_with_the_widened_surface(
+    private: str,
+) -> None:
+    """Widening the seam exports the lexicon model and the two limits — not the
+    fallback, guard, matcher, or normalizer machinery behind them. A name pulled
+    into the package root but left out of `__all__` would still be reachable, so
+    reachability is what is asserted here, not membership."""
+    assert not hasattr(lexiqr, private)

@@ -10,7 +10,7 @@ gated, for trend-watching.
 
 import pytest
 
-from lexiqr.guard import MAX_PROMPT_LENGTH
+from lexiqr import MAX_PROMPT_LENGTH
 from perf import benchmark
 from perf.lexicon_generator import generate_benchmark_lexicon
 

@@ -11,8 +11,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from lexiqr import EntityResolver, ScoreTier
-from lexiqr.lexicon import Lexicon
+from lexiqr import EntityResolver, Lexicon, ScoreTier
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 FLOOFF = REPO_ROOT / "examples" / "flooff.lexicon.json"

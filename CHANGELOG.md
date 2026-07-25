@@ -16,7 +16,27 @@ down under a new `## [x.y.z]` heading dated on the day it ships.
 
 ## [Unreleased]
 
-_Nothing yet._
+Pending for **1.1.0** — the version `pyproject.toml` already declares. Cutting
+the release moves these notes into a `## [1.1.0]` heading dated on the day it
+ships; until then the top released entry below stays 1.0.0.
+
+### Added
+
+- **`Lexicon` and `SurfaceForms` are public.** `Lexicon` is the declared
+  parameter type of `EntityResolver(...)`, and validation is construction — so
+  `Lexicon.from_file` / `Lexicon.from_dict` now give an integrating developer a
+  validation-only workflow (load a tenant's file, catch `ValidationError`) with
+  no throwaway resolver, and a resolver can be built from a lexicon the caller
+  already holds. `SurfaceForms` is the per-entity, per-locale shape a lexicon
+  holds.
+- **The two documented limits are public constants** — `MAX_PROMPT_LENGTH`
+  (10,000 characters) and `MAX_SURFACE_FORM_LENGTH` (128 characters) — so
+  callers sizing input or generating labels read the number lexiqr enforces
+  instead of copying it. Both were already documented and fixed; only their
+  visibility changed.
+
+Additive only: no resolution behaviour changed, and nothing else became public
+— the fallback, guard, index, matcher and normalizer machinery stays internal.
 
 ## [1.0.0] - 2026-07-24
 
