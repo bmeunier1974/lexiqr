@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from lexiqr.errors import ValidationError
+from lexiqr.errors import MalformedDocumentError, ValidationError
 from lexiqr.locale import is_well_formed
 
 #: The one lexicon format version core implements (ADR 0003).
@@ -107,11 +107,23 @@ class Lexicon:
 
     @classmethod
     def from_file(cls, path: str | Path) -> Lexicon:
+        """Read `path`, parse it, and validate what it holds — once, here.
+
+        This is the one place lexiqr turns a file into a lexicon, so it is also
+        the one place the wording for "that file is not JSON" is written. A
+        caller that reads and parses the file itself only to hand the result to
+        `from_dict` would be phrasing that failure a second time, and the two
+        phrasings would drift.
+
+        The two ways this fails are kept apart by type: an unreadable path is
+        the operating system's `OSError`, reported in its own words, while a
+        file that is not JSON is a `MalformedDocumentError`.
+        """
         text = Path(path).read_text(encoding="utf-8")
         try:
             document = json.loads(text)
         except json.JSONDecodeError as broken:
-            raise ValidationError(
+            raise MalformedDocumentError(
                 f"{path} is not valid JSON: {broken.msg} "
                 f"(line {broken.lineno}, column {broken.colno})."
             ) from broken

@@ -10,7 +10,9 @@ declared parameter type of the constructor, and validation *is* construction —
 `Lexicon.from_file` / `from_dict` either return a lexicon core can trust or raise
 `ValidationError` naming where the document is wrong. Exporting it lets a lexicon
 be loaded, checked, and held on its own, without building a throwaway resolver to
-find out whether a tenant's file is valid.
+find out whether a tenant's file is valid. `MalformedDocumentError` is the one
+load failure with no place in the document to name — the file is not JSON at all
+— so a caller can tell a wrong path from a wrong lexicon.
 
 `MAX_PROMPT_LENGTH` and `MAX_SURFACE_FORM_LENGTH` are documented, semver-governed
 numbers rather than configuration, so a caller sizing input or generating labels
@@ -20,7 +22,7 @@ Nothing behind these is public: fallback, guard, index, locale, matcher and
 normalizer stay internal, and can change in a patch.
 """
 
-from lexiqr.errors import ValidationError
+from lexiqr.errors import MalformedDocumentError, ValidationError
 from lexiqr.guard import MAX_PROMPT_LENGTH
 from lexiqr.lexicon import MAX_SURFACE_FORM_LENGTH, Lexicon, SurfaceForms
 from lexiqr.resolver import EntityResolver
@@ -33,6 +35,7 @@ __all__ = [
     "EntityMatch",
     "EntityResolver",
     "Lexicon",
+    "MalformedDocumentError",
     "MatchReport",
     "ScoreTier",
     "SurfaceForms",

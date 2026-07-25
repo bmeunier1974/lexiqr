@@ -10,6 +10,8 @@ the surface is a decision someone takes in this file, and any name that reaches
 `lexiqr.__all__` without being written here fails as the accidental export it is.
 """
 
+from pathlib import Path
+
 import pytest
 
 import lexiqr
@@ -24,6 +26,7 @@ PUBLIC_SURFACE = {
     "Lexicon",
     "MAX_PROMPT_LENGTH",
     "MAX_SURFACE_FORM_LENGTH",
+    "MalformedDocumentError",
     "MatchReport",
     "ScoreTier",
     "SurfaceForms",
@@ -78,6 +81,40 @@ def test_coordinates_a_failure_does_not_have_are_none() -> None:
 
     assert error.canonical_id is None
     assert error.locale is None
+
+
+def test_a_file_that_is_not_json_at_all_faults_as_a_malformed_document(
+    tmp_path: Path,
+) -> None:
+    """The file never became a document, so there was nothing to validate.
+
+    Distinguishable on its own — a caller can tell "your path points at
+    something that is not a lexicon file" from "your lexicon says the wrong
+    thing", which is what lets the CLI give the two different exit codes without
+    re-wording either message.
+    """
+    from lexiqr import Lexicon, MalformedDocumentError, ValidationError
+
+    path = tmp_path / "truncated.lexicon.json"
+    path.write_text('{"schemaVersion": "1",', encoding="utf-8")
+
+    with pytest.raises(MalformedDocumentError) as raised:
+        Lexicon.from_file(path)
+
+    assert isinstance(raised.value, ValidationError)
+    assert "JSON" in raised.value.message
+    assert str(path) in raised.value.message
+
+
+def test_a_document_that_parsed_but_is_wrong_is_not_a_malformed_document() -> None:
+    """The other side of the distinction: a lexicon fault stays a lexicon fault,
+    so code that catches the malformed-document case cannot swallow one."""
+    from lexiqr import Lexicon, MalformedDocumentError, ValidationError
+
+    with pytest.raises(ValidationError) as raised:
+        Lexicon.from_dict({"schemaVersion": "99", "entities": {}})
+
+    assert not isinstance(raised.value, MalformedDocumentError)
 
 
 # --- The lexicon seam: `Lexicon` is the declared parameter type of the public

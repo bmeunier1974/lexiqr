@@ -118,6 +118,12 @@ valid: ['product'] in de-DE
 A `Lexicon` you already hold goes straight into a resolver —
 `EntityResolver(lexicon)` — so nothing is parsed or validated twice.
 
+A file that is not JSON at all raises `MalformedDocumentError`. It *is* a
+`ValidationError`, so the `except` above already covers it; catch it by name only
+when you need to tell "that file is not a lexicon document" from "that lexicon
+says the wrong thing" — the distinction the `lexiqr` CLI turns into its two exit
+codes.
+
 ## Input limits
 
 `transform()` accepts a prompt of at most **10,000 characters** (Unicode code points), exported as `MAX_PROMPT_LENGTH`. A prompt over that limit raises `ValidationError` — the same structured error every other lexiqr failure raises — before any matching work happens, so a pasted document is rejected cheaply rather than taking a request thread with it. Reject or truncate upstream if your callers can paste arbitrary text.
@@ -164,7 +170,9 @@ that surface is named explicitly. Semver governs:
   validating `from_file` / `from_dict` constructors, and `SurfaceForms`, the
   shape it holds per entity and locale.
 - **The structured error types** — `ValidationError` and its coordinates
-  (`canonical_id`, `locale`, `field`), which the CLI renders verbatim.
+  (`canonical_id`, `locale`, `field`), which the CLI renders verbatim, and
+  `MalformedDocumentError`, the `ValidationError` subclass raised when a file is
+  not JSON at all.
 - **The match report types** — `MatchReport`, `EntityMatch`, and `ScoreTier`,
   and the fields a caller reads off them (span, tier, correction).
 - **The canonical report serialization** — the byte-level shape produced by

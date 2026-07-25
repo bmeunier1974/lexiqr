@@ -1,9 +1,11 @@
 """The `lexiqr` command line — the no-Python interface for lexicon authors.
 
-This is the thin shell: it parses arguments, reads a file, parses JSON, calls
-lexiqr's public API, hands the typed result to a pure renderer, and maps the
-outcome to an exit code. It holds no validation logic and no matching logic
-(ADR 0002) — if the CLI ever needs a private import, the public API is missing
+This is the thin shell: it parses arguments, asks lexiqr's public API to load
+the lexicon, hands the typed result to a pure renderer, and maps the outcome to
+an exit code. It holds no loading logic, no validation logic and no matching
+logic (ADR 0002) — it never opens the file or parses the JSON itself, because a
+second reading of the same file is a second chance to phrase the same failure
+differently. If the CLI ever needs a private import, the public API is missing
 something.
 
 Two error families are kept visibly distinct so an author can tell "your path
@@ -21,14 +23,16 @@ error goes to stderr, so an author can pipe or capture just the part they need.
 from __future__ import annotations
 
 import argparse
-import json
 import sys
-from pathlib import Path
-from typing import Any
 
-from lexiqr import EntityResolver, ValidationError
+from lexiqr import EntityResolver, Lexicon, MalformedDocumentError, ValidationError
 from lexiqr.cli._report import render_match_report
-from lexiqr.cli._validation import render_valid_lexicon, render_validation_errors
+from lexiqr.cli._validation import (
+    render_malformed_document,
+    render_unreadable_source,
+    render_valid_lexicon,
+    render_validation_errors,
+)
 
 #: The lexicon loaded, resolved, or matched — nothing went wrong.
 EXIT_OK = 0
@@ -55,73 +59,49 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def _validate(source: str) -> int:
-    document, load_code = _load_document(source)
-    if document is None:
-        return load_code
-
-    errors = _lexicon_errors(document)
-    if errors is not None:
-        print(render_validation_errors(source, errors), file=sys.stderr)
-        return EXIT_INVALID_LEXICON
+    lexicon, failure = _load(source)
+    if lexicon is None:
+        return failure
 
     print(render_valid_lexicon(source))
     return EXIT_OK
 
 
 def _try(args: argparse.Namespace) -> int:
-    document, load_code = _load_document(args.lexicon)
-    if document is None:
-        return load_code
+    lexicon, failure = _load(args.lexicon)
+    if lexicon is None:
+        return failure
 
-    try:
-        resolver = EntityResolver.from_dict(document)
-    except ValidationError as invalid:
-        print(render_validation_errors(args.lexicon, [invalid]), file=sys.stderr)
-        return EXIT_INVALID_LEXICON
-
-    report = resolver.transform(args.prompt, args.locale)
+    report = EntityResolver(lexicon).transform(args.prompt, args.locale)
     print(render_match_report(report))
     return EXIT_OK if report.matches else EXIT_NO_MATCH
 
 
-def _load_document(source: str) -> tuple[Any | None, int]:
-    """Read and parse `source`, or report a CLI-level failure.
+def _load(source: str) -> tuple[Lexicon | None, int]:
+    """Load `source` through lexiqr's public API, or report why it could not.
 
-    Returns the parsed document and ``EXIT_OK`` on success; ``None`` and
-    ``EXIT_CLI_ERROR`` on a missing / unreadable file or malformed JSON, having
-    already written the diagnostic to stderr. These are the shell's own
-    failures, phrased so they cannot be mistaken for a lexicon error.
+    The file is read, parsed and validated exactly once, by core, for both
+    commands: `validate` says whether that load succeeded, and `try` matches
+    against the very lexicon it returned — so validation and matching cannot
+    describe two different readings of one file within a single run.
+
+    Returns the lexicon and ``EXIT_OK``, or ``None`` and the exit code the
+    failure earns, having already written the diagnostic to stderr. The three
+    failures are told apart by the type core raises, never by reading its
+    message: an unreadable path and a file that is not JSON are the shell's own
+    CLI-level failures, while a document core rejected is a lexicon error.
     """
     try:
-        text = Path(source).read_text(encoding="utf-8")
+        return Lexicon.from_file(source), EXIT_OK
     except OSError as unreadable:
-        reason = unreadable.strerror or str(unreadable)
-        print(f"lexiqr: cannot read {source}: {reason}", file=sys.stderr)
+        print(render_unreadable_source(source, unreadable), file=sys.stderr)
         return None, EXIT_CLI_ERROR
-
-    try:
-        return json.loads(text), EXIT_OK
-    except json.JSONDecodeError as malformed:
-        print(
-            f"lexiqr: {source} is not valid JSON: {malformed.msg} "
-            f"(line {malformed.lineno}, column {malformed.colno}).",
-            file=sys.stderr,
-        )
+    except MalformedDocumentError as malformed:
+        print(render_malformed_document(malformed), file=sys.stderr)
         return None, EXIT_CLI_ERROR
-
-
-def _lexicon_errors(document: Any) -> list[ValidationError] | None:
-    """Load `document` through the public API, returning any faults it raises.
-
-    ``None`` means the lexicon is valid. A list — one fault today, since core
-    surfaces the first — means it is not. The shell never inspects the fault; it
-    hands it straight to the renderer.
-    """
-    try:
-        EntityResolver.from_dict(document)
     except ValidationError as invalid:
-        return [invalid]
-    return None
+        print(render_validation_errors(source, [invalid]), file=sys.stderr)
+        return None, EXIT_INVALID_LEXICON
 
 
 def _build_parser() -> argparse.ArgumentParser:

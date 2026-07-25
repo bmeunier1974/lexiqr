@@ -35,6 +35,16 @@ ships; until then the top released entry below stays 1.0.0.
   instead of copying it. Both were already documented and fixed; only their
   visibility changed.
 
+- **`MalformedDocumentError` names the load failure that has no coordinates** —
+  the file is not JSON, so it never became a document and nothing in it can be
+  pointed at. It subclasses `ValidationError`, so code catching the general load
+  failure is unaffected; catching it by name tells "that file is not a lexicon
+  document" from "that lexicon says the wrong thing". `lexiqr validate` and
+  `lexiqr try` now load through `Lexicon.from_file` like any other caller
+  instead of reading and parsing the file themselves, so the malformed-JSON
+  message an author reads is core's own sentence, under the CLI's prefix — one
+  wording, one code path (ADR 0002). CLI output and exit codes are unchanged.
+
 Additive only: no resolution behaviour changed, and nothing else became public
 — the fallback, guard, index, locale, matcher and normalizer machinery stays
 internal.
