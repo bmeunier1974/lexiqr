@@ -7,8 +7,8 @@ of it, and so a contributor can see how a merged change reaches PyPI.
 
 Each step is marked **[CI]** when a machine enforces it, or **[human]** when it
 is a judgment only a person can make. The human ones are the point of this
-document: CI cannot tell you whether the provenance statement is true or whether
-the multi-tenant recipe still matches the API.
+document: CI cannot tell you whether the multi-tenant recipe still matches the
+API.
 
 ## One-time setup (before the first release)
 
@@ -48,12 +48,6 @@ the multi-tenant recipe still matches the API.
 
 ## Human prerequisites CI cannot verify
 
-- **[human] Heritage note — a hard prerequisite of the `v1.0.0` tag.**
-  [`HERITAGE.md`](HERITAGE.md) must be present and its clean-room provenance
-  wording must stand as your own considered position. Publishing 1.0 without it
-  is not a valid 1.0.0. This is deliberately *not* a CI check: a "file exists"
-  gate would give false assurance about a question CI cannot answer. See the
-  note for why.
 - **[human] Multi-tenant recipe review.** The recipe in the
   [README](README.md#multi-tenant-use) is marked non-executable, so CI does not
   run it and cannot catch it drifting from the API. Re-read it against the

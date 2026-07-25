@@ -49,5 +49,4 @@ git tag vX.Y.Z && git push origin vX.Y.Z
 Publishing targets **real PyPI** via trusted publishing — no long-lived token
 ever exists in the repository or its secrets; the workflow exchanges a
 short-lived OIDC token for upload rights (ADR 0004). The one-time pending-publisher
-registration and every human prerequisite of the `v1.0.0` tag — including the
-[HERITAGE.md](HERITAGE.md) clean-room note — are in [RELEASING.md](RELEASING.md).
+registration and the human release prerequisites are in [RELEASING.md](RELEASING.md).

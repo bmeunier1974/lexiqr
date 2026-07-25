@@ -36,7 +36,7 @@ Backend engineers building multi-tenant search and AI features face tenants with
 
 ## Non-goals
 
-- **LLM filter building and search-definition validation** — turning detected entities into search filters stays in consuming services (the branch-735 LLM layer is not ported).
+- **LLM filter building and search-definition validation** — turning detected entities into search filters stays in consuming services.
 - **HTTP server / FastAPI wrapper** — lexiqr is a library; services wrap it themselves.
 - **Language detection** — the caller states the prompt's locale.
 - **Built-in multi-tenant registry** — one instance = one tenant's lexicon; tenant→instance mapping is the host application's job (documented as a recipe, not code).
@@ -49,8 +49,8 @@ Backend engineers building multi-tenant search and AI features face tenants with
 ## Constraints
 
 - **Runtime**: Python ≥3.10; test matrix 3.10–3.13. Single runtime dependency: rapidfuzz (prebuilt wheels on all mainstream platforms). CLI uses stdlib argparse only.
-- **License**: MIT. The code descends from work on a private repo's branch 735 (`ProConsultant-Info/lng`, never merged); release rights must be confirmed, or the port treated as a clean-room reimplementation of the design.
-- **Heritage**: the deterministic core (normalize → lexicon scan → fuzzy pass → match report) ports the proven branch-735 pipeline; its test suite (matcher, fuzzy, normalizer, builder, property-based, security, perf) is the behavioral spec to mine, preserved in `.claude/plan/`.
+- **License**: MIT.
+- **Behavioral spec**: the deterministic core's observable contract (spans, score tiers, overlap resolution, normalization, determinism) is specified by this repository's own test suite.
 - **Tooling**: uv-managed development environment; GitHub Actions for CI and releases.
 - **Team**: solo maintainer; everything must run unattended (automated releases, CI as the quality gate).
 

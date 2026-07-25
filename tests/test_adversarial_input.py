@@ -1,12 +1,11 @@
 """Adversarial Unicode through the public API — the load-bearing behaviour of C8.
 
 `transform()` must answer hostile free-form text with a clear result or a
-structured error, never a hang, a crash, or a corrupted match. These tests port
-the branch-735 security suite's behaviours and exercise them through the public
-API, with `fuzzy` on and off, so the guarantee is never quietly conditional on
-configuration. They assert external behaviour only: what `transform()` returns
-or raises, whether it stays within a generous time ceiling, and that every
-returned span still indexes the original prompt.
+structured error, never a hang, a crash, or a corrupted match. These tests
+exercise that guarantee through the public API, with `fuzzy` on and off, so it
+is never quietly conditional on configuration. They assert external behaviour
+only: what `transform()` returns or raises, whether it stays within a generous
+time ceiling, and that every returned span still indexes the original prompt.
 """
 
 import time

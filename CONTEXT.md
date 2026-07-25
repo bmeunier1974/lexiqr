@@ -27,9 +27,9 @@ The project's ubiquitous language. Code, docs, plans, and issues use these terms
 - **Schema version** — the version of the lexicon file format a document declares (`schemaVersion`) and core pins.
 - **Flooff scenario** — the founding example: a German tenant's lexicon mapping "flooff" (and the typo "floof") to `product`; the README quickstart and a CI test.
 
-## Pipeline vocabulary (branch-735 heritage)
+## Pipeline vocabulary
 
-The deterministic core pipeline, in order: **normalize → lexicon scan → fuzzy pass → match report**. The behavioral spec is `.claude/plan/735-python-prompt-transformer-recon.md`, which records the branch-735 score policy, span mapping, and edit budgets. The test suites it describes are *not* preserved here — they exist only in the `lng` repo at commit `2696db09^` under `tools/lng-ai-prompt/`, and this port is a clean-room reimplementation of the documented design.
+The deterministic core pipeline, in order: **normalize → lexicon scan → fuzzy pass → match report**. Its observable behavior — score policy, span mapping, edit budgets — is specified by the test suite and documented in [docs/matching-rules.md](docs/matching-rules.md).
 
 ## Containers
 

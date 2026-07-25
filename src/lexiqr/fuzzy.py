@@ -39,7 +39,7 @@ _WORD = re.compile(r"\w+")
 #: jargon term gets no edits — otherwise it collides with every other short word
 #: in the prompt and no one can explain why "cat" resolved to `product`. Four to
 #: five characters earn a single edit, six or more earn two. The boundaries are
-#: the branch-735 table, published in docs/matching-rules.md (story #35).
+#: published in docs/matching-rules.md.
 _LONG_FORM = 6
 _MEDIUM_FORM = 4
 

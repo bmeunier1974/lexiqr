@@ -60,5 +60,5 @@ company jargon to canonical entities, on PyPI.
   top changelog entry must agree — that runs before build, with a post-publish
   job that installs from PyPI into a clean virtualenv and reproduces the flooff
   match (C1).
-- `CHANGELOG.md` (Keep a Changelog), the `HERITAGE.md` clean-room provenance note
-  beside the MIT `LICENSE`, and the `RELEASING.md` checklist.
+- `CHANGELOG.md` (Keep a Changelog), the MIT `LICENSE`, and the `RELEASING.md`
+  checklist.

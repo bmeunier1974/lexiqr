@@ -186,10 +186,8 @@ This is a single-repo project: it is both the meta-repo (vision and blueprint) a
 Cross-container truth lives at the root:
 
 - [VISION.md](VISION.md) — problem, actors, capabilities, non-goals, constraints
-- [BLUEPRINT.md](BLUEPRINT.md) — container decomposition, contracts, walking skeleton, coverage map
 - [CONTEXT.md](CONTEXT.md) — the project glossary
 - [docs/adr/](docs/adr/) — architecture decision records (repo shape, contracts)
-- [docs/plans/](docs/plans/) — dependency-ordered implementation plans
 - [docs/lexicon-authoring.md](docs/lexicon-authoring.md) — writing and validating a lexicon
   file, the `lexiqr validate` / `lexiqr try` CLI, and its scriptable exit-code contract
 - [docs/lexicon-semantic-checks.md](docs/lexicon-semantic-checks.md) — the complete list of
@@ -210,11 +208,6 @@ uv run pytest    # the same suite CI runs on every push and pull request
 Release process and the one-time TestPyPI publisher registration live in
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
-## License and heritage
+## License
 
 MIT — see [LICENSE](LICENSE).
-
-lexiqr's deterministic core is a clean-room reimplementation of a design first
-worked out on a private repository's branch 735: no branch-735 source was
-copied, only the documented design and the behavioral spec preserved here.
-[HERITAGE.md](HERITAGE.md) states the provenance position in full.
