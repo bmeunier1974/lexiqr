@@ -33,6 +33,17 @@ def with_alternate(alternate: str) -> Any:
     return document
 
 
+def authored_in(tag: str) -> dict[str, Any]:
+    """A one-entity lexicon whose only locale key is `tag`."""
+    return {
+        "schemaVersion": "1",
+        "defaultLocale": "de-DE",
+        "entities": {
+            "product": {"locales": {tag: {"preferred": {"singular": "flooff"}}}}
+        },
+    }
+
+
 def test_a_lexicon_declaring_an_unsupported_schema_version_is_rejected() -> None:
     document = flooff_document()
     document["schemaVersion"] = "99"
@@ -94,6 +105,47 @@ def test_no_invalid_lexicon_survives_construction_to_reach_transform() -> None:
         f"the failure would have been deferred to transform(): "
         f"{resolver.transform('wo ist flooff', 'de-DE')}"
     )
+
+
+# --- The locale tag grammar: the BCP 47 subset the format accepts, mirroring
+# --- the published schema's `$defs/locale`. A tag is an opaque identifier — it
+# --- is compared case-insensitively but never rewritten — so what the grammar
+# --- accepts is exactly what the schema states: an underscore is not a hyphen,
+# --- and a tag is never canonicalised into shape on the author's behalf.
+
+
+@pytest.mark.parametrize(
+    "tag", ["de", "de-DE", "DE-de", "de-Latn-DE", "es-419", "fil-PH"]
+)
+def test_a_well_formed_locale_tag_is_accepted_in_the_casing_it_was_authored_in(
+    tag: str,
+) -> None:
+    lexicon = Lexicon.from_dict(authored_in(tag))
+
+    assert set(lexicon.entities["product"]) == {tag}
+
+
+@pytest.mark.parametrize(
+    "tag", ["", "d", "de_DE", "german!", "deutsch-DE", "de-DE-x", "de-DEU"]
+)
+def test_a_locale_tag_outside_the_grammar_is_rejected_and_named(tag: str) -> None:
+    with pytest.raises(ValidationError) as raised:
+        Lexicon.from_dict(authored_in(tag))
+
+    error = raised.value
+    assert error.canonical_id == "product"
+    assert error.locale == tag
+    assert error.field == "locales"
+
+
+def test_the_declared_default_obeys_the_same_grammar_as_a_locale_key() -> None:
+    document = authored_in("de-DE")
+    document["defaultLocale"] = "de_DE"
+
+    with pytest.raises(ValidationError) as raised:
+        Lexicon.from_dict(document)
+
+    assert raised.value.field == "defaultLocale"
 
 
 # --- The surface-form length limit, at its boundary. The limit is a public

@@ -189,6 +189,35 @@ def test_the_exact_requested_locale_answers_and_the_walk_stops_there() -> None:
     assert report.locale == "de-AT"
 
 
+def test_a_request_in_another_casing_resolves_and_reports_the_lexicons_spelling() -> (
+    None
+):
+    # Tags are compared case-insensitively the whole way through — chain,
+    # index lookup, and report — and never rewritten.
+    resolver = EntityResolver.from_dict(_de_variants())
+
+    report = resolver.transform("wo ist flooff", "DE-de")
+
+    assert [match.canonical_id for match in report.matches] == ["product"]
+    assert report.matches[0].matched_locale == "de-DE"
+    assert report.locale == "de-DE"
+
+
+def test_a_lexicon_authored_in_another_casing_answers_an_ordinary_request() -> None:
+    authored = {
+        "schemaVersion": "1",
+        "defaultLocale": "DE-de",
+        "entities": {
+            "product": {"locales": {"DE-de": {"preferred": {"singular": "flooff"}}}}
+        },
+    }
+
+    report = EntityResolver.from_dict(authored).transform("wo ist flooff", "de-DE")
+
+    assert report.matches[0].matched_locale == "DE-de"
+    assert report.locale == "DE-de"
+
+
 def test_a_prompt_matching_nothing_in_the_chain_keeps_the_requested_locale() -> None:
     report = EntityResolver.from_dict(_de_variants()).transform(
         "wo ist der bahnhof", "de-AT"

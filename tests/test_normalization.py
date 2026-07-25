@@ -99,6 +99,14 @@ def test_arabic_letters_that_differ_only_by_hamza_are_not_conflated() -> None:
     assert report.matches == ()
 
 
+def test_the_script_policy_reads_the_language_subtag_whatever_its_casing() -> None:
+    """`AR-eg` names the same language as `ar-EG`: the subtag is folded first."""
+    resolver = EntityResolver.from_dict(lexicon("AR-eg", "اسم"))
+
+    assert resolver.transform("أسم الحلقة", "AR-eg").matches == ()
+    assert resolver.transform("اسم الحلقة", "AR-eg").matches != ()
+
+
 def test_an_arabic_prompt_resolves_with_a_span_that_slices_the_original() -> None:
     resolver = EntityResolver.from_dict(lexicon("ar-EG", "منتج", plural="منتجات"))
 

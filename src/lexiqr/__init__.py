@@ -16,8 +16,8 @@ find out whether a tenant's file is valid.
 numbers rather than configuration, so a caller sizing input or generating labels
 reads the limit lexiqr actually enforces instead of copying it.
 
-Nothing behind these is public: fallback, guard, index, matcher and normalizer
-stay internal, and can change in a patch.
+Nothing behind these is public: fallback, guard, index, locale, matcher and
+normalizer stay internal, and can change in a patch.
 """
 
 from lexiqr.errors import ValidationError

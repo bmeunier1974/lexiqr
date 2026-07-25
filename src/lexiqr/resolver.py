@@ -10,6 +10,7 @@ from lexiqr import fallback
 from lexiqr.guard import check_prompt, is_blank
 from lexiqr.index import SurfaceFormIndex
 from lexiqr.lexicon import Lexicon
+from lexiqr.locale import deduplicate, fold
 from lexiqr.matcher import scan
 from lexiqr.types import MatchReport
 
@@ -53,7 +54,7 @@ class EntityResolver:
         self._fuzzy = fuzzy
         self._available = _declared_locales(lexicon)
         self._indexes = {
-            locale.casefold(): SurfaceFormIndex.build(lexicon, locale)
+            fold(locale): SurfaceFormIndex.build(lexicon, locale)
             for locale in self._available
         }
         self._explicit_chain = (
@@ -120,7 +121,7 @@ class EntityResolver:
         for chain_locale in chain:
             matches = scan(
                 prompt,
-                self._indexes[chain_locale.casefold()],
+                self._indexes[fold(chain_locale)],
                 chain_locale,
                 fuzzy_enabled=self._fuzzy,
             )
@@ -135,8 +136,6 @@ def _declared_locales(lexicon: Lexicon) -> tuple[str, ...]:
     Comparison is case-insensitive — a tag is an opaque identifier — so the
     first spelling encountered stands in for any later case variant of it.
     """
-    seen: dict[str, str] = {}
-    for locales in lexicon.entities.values():
-        for locale in locales:
-            seen.setdefault(locale.casefold(), locale)
-    return tuple(seen.values())
+    return deduplicate(
+        locale for locales in lexicon.entities.values() for locale in locales
+    )

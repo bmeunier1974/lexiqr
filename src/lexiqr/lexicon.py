@@ -14,12 +14,12 @@ have stay `None` rather than being invented.
 from __future__ import annotations
 
 import json
-import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from lexiqr.errors import ValidationError
+from lexiqr.locale import is_well_formed
 
 #: The one lexicon format version core implements (ADR 0003).
 SCHEMA_VERSION = "1"
@@ -34,10 +34,6 @@ SCHEMA_VERSION = "1"
 #: into a validation-time error the author can fix. Documented in
 #: docs/lexicon-semantic-checks.md; changing it is a semver-visible change.
 MAX_SURFACE_FORM_LENGTH = 128
-
-#: The subset of BCP 47 the lexicon format accepts, mirroring the published
-#: schema's `$defs/locale` — language, optional script, optional region.
-_LOCALE = re.compile(r"[A-Za-z]{2,3}(-[A-Za-z]{4})?(-([A-Za-z]{2}|[0-9]{3}))?")
 
 #: Keys the v1 format defines, mirroring the schema's `additionalProperties`
 #: bans. A key outside these is a typo, and a typo silently ignored is a
@@ -80,7 +76,7 @@ class Lexicon:
         _reject_unknown_keys(document, _DOCUMENT_KEYS, "the lexicon document")
 
         default_locale = document.get("defaultLocale")
-        if not isinstance(default_locale, str) or not _LOCALE.fullmatch(default_locale):
+        if not isinstance(default_locale, str) or not is_well_formed(default_locale):
             raise _fault(
                 "defaultLocale",
                 f"is {default_locale!r}, which is not a well-formed locale tag "
@@ -146,7 +142,7 @@ def _locales(entity: Any, canonical_id: str) -> dict[str, SurfaceForms]:
         )
 
     for locale in locales:
-        if not _LOCALE.fullmatch(locale):
+        if not is_well_formed(locale):
             raise _fault(
                 "locales",
                 f"has key {locale!r}, which is not a well-formed locale tag "
