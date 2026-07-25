@@ -8,21 +8,15 @@ prompt resolving against `de-DE` surface forms, the requested locale winning
 when it too could match, and the report naming the locale that answered.
 """
 
-from pathlib import Path
 from typing import Any
 
 import pytest
 
+from conftest import REPO_ROOT, lexicon_document
 from lexiqr import EntityResolver, ValidationError
 from lexiqr.fallback import build_chain, resolve_explicit_chain
 
-MEDIEN_DE = (
-    Path(__file__).resolve().parent.parent
-    / "schema"
-    / "fixtures"
-    / "valid"
-    / "medien-de.lexicon.json"
-)
+MEDIEN_DE = REPO_ROOT / "schema" / "fixtures" / "valid" / "medien-de.lexicon.json"
 
 
 # --- The chain builder, in isolation (no matching pipeline) -----------------
@@ -153,19 +147,16 @@ def test_the_requested_variant_leads_even_when_a_sibling_sorts_earlier() -> None
 
 def _de_variants() -> dict[str, Any]:
     """`product` authored only in de-DE; `invoice` in both de-DE and de-AT."""
-    return {
-        "schemaVersion": "1",
-        "defaultLocale": "de-DE",
-        "entities": {
-            "product": {"locales": {"de-DE": {"preferred": {"singular": "flooff"}}}},
-            "invoice": {
-                "locales": {
-                    "de-DE": {"preferred": {"singular": "rechnung"}},
-                    "de-AT": {"preferred": {"singular": "rechnung"}},
-                }
-            },
+    return lexicon_document(
+        "de-DE",
+        product={"preferred": {"singular": "flooff"}},
+        invoice={
+            "locales": {
+                "de-DE": {"preferred": {"singular": "rechnung"}},
+                "de-AT": {"preferred": {"singular": "rechnung"}},
+            }
         },
-    }
+    )
 
 
 def test_a_de_at_prompt_resolves_through_de_de_surface_forms() -> None:
@@ -204,13 +195,7 @@ def test_a_request_in_another_casing_resolves_and_reports_the_lexicons_spelling(
 
 
 def test_a_lexicon_authored_in_another_casing_answers_an_ordinary_request() -> None:
-    authored = {
-        "schemaVersion": "1",
-        "defaultLocale": "DE-de",
-        "entities": {
-            "product": {"locales": {"DE-de": {"preferred": {"singular": "flooff"}}}}
-        },
-    }
+    authored = lexicon_document("DE-de", product={"preferred": {"singular": "flooff"}})
 
     report = EntityResolver.from_dict(authored).transform("wo ist flooff", "de-DE")
 
@@ -346,18 +331,13 @@ def test_omitting_the_chain_leaves_the_default_policy_in_place() -> None:
 
 def _invoice_in(*locales: str) -> dict[str, Any]:
     """`invoice`/'rechnung' authored identically across the given variants."""
-    return {
-        "schemaVersion": "1",
-        "defaultLocale": "de-DE",
-        "entities": {
-            "invoice": {
-                "locales": {
-                    locale: {"preferred": {"singular": "rechnung"}}
-                    for locale in locales
-                }
+    return lexicon_document(
+        invoice={
+            "locales": {
+                locale: {"preferred": {"singular": "rechnung"}} for locale in locales
             }
-        },
-    }
+        }
+    )
 
 
 def test_the_earliest_sibling_answers_when_the_requested_variant_is_absent() -> None:
@@ -417,18 +397,15 @@ def test_a_misspelled_form_in_a_fallback_locale_resolves_with_its_correction() -
 def test_an_earlier_fuzzy_match_beats_a_later_exact_match() -> None:
     # de-AT (earlier) fuzzy-matches the typed word; de-DE (later) would match it
     # exactly. Chain position is decided before match quality, so de-AT wins.
-    lexicon = {
-        "schemaVersion": "1",
-        "defaultLocale": "de-DE",
-        "entities": {
-            "product": {
-                "locales": {
-                    "de-AT": {"preferred": {"singular": "flooof"}},
-                    "de-DE": {"preferred": {"singular": "flooff"}},
-                }
+    lexicon = lexicon_document(
+        "de-DE",
+        product={
+            "locales": {
+                "de-AT": {"preferred": {"singular": "flooof"}},
+                "de-DE": {"preferred": {"singular": "flooff"}},
             }
         },
-    }
+    )
 
     report = EntityResolver.from_dict(lexicon).transform("wo ist flooff", "de-AT")
 

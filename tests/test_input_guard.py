@@ -7,16 +7,11 @@ of tests through the public API (below) proves the guard is actually wired in
 ahead of matching.
 """
 
-from pathlib import Path
-
 import pytest
 
+from conftest import FLOOFF_LEXICON
 from lexiqr import MAX_PROMPT_LENGTH, EntityResolver, ValidationError
 from lexiqr.guard import check_prompt, is_blank
-
-FIXTURE_PATH = (
-    Path(__file__).resolve().parent.parent / "examples" / "flooff.lexicon.json"
-)
 
 
 def test_a_prompt_over_the_maximum_length_is_rejected() -> None:
@@ -110,7 +105,7 @@ def test_surrogate_free_adversarial_text_is_accepted_unchanged(prompt: str) -> N
 
 
 def test_transform_rejects_an_oversized_prompt_with_the_structured_error() -> None:
-    resolver = EntityResolver.from_file(FIXTURE_PATH)
+    resolver = EntityResolver.from_file(FLOOFF_LEXICON)
 
     with pytest.raises(ValidationError):
         resolver.transform("x" * (MAX_PROMPT_LENGTH + 1), "de-DE")
@@ -120,7 +115,7 @@ def test_the_guard_runs_before_matching_even_when_the_prompt_would_match() -> No
     # A prompt that contains a real surface form ("flooff") but is padded past
     # the limit must still be rejected: the guard is consulted before any scan,
     # so a hostile prompt costs a rejection rather than a full pipeline pass.
-    resolver = EntityResolver.from_file(FIXTURE_PATH)
+    resolver = EntityResolver.from_file(FLOOFF_LEXICON)
     oversized = "flooff " + "x" * MAX_PROMPT_LENGTH
 
     with pytest.raises(ValidationError):
@@ -129,7 +124,7 @@ def test_the_guard_runs_before_matching_even_when_the_prompt_would_match() -> No
 
 @pytest.mark.parametrize("prompt", ["", "   ", "\t\n", " "])
 def test_transform_returns_an_empty_report_for_blank_input(prompt: str) -> None:
-    resolver = EntityResolver.from_file(FIXTURE_PATH)
+    resolver = EntityResolver.from_file(FLOOFF_LEXICON)
 
     report = resolver.transform(prompt, "de-DE")
 
@@ -139,7 +134,7 @@ def test_transform_returns_an_empty_report_for_blank_input(prompt: str) -> None:
 
 
 def test_whitespace_only_input_is_treated_exactly_like_empty_input() -> None:
-    resolver = EntityResolver.from_file(FIXTURE_PATH)
+    resolver = EntityResolver.from_file(FLOOFF_LEXICON)
 
     empty = resolver.transform("", "de-DE")
     whitespace = resolver.transform("   ", "de-DE")
@@ -149,7 +144,7 @@ def test_whitespace_only_input_is_treated_exactly_like_empty_input() -> None:
 
 
 def test_a_prompt_just_under_the_limit_still_resolves_with_valid_spans() -> None:
-    resolver = EntityResolver.from_file(FIXTURE_PATH)
+    resolver = EntityResolver.from_file(FLOOFF_LEXICON)
     padding = "x" * (MAX_PROMPT_LENGTH - len("flooff "))
     prompt = "flooff " + padding
     assert len(prompt) <= MAX_PROMPT_LENGTH

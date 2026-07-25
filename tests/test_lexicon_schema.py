@@ -12,9 +12,9 @@ import pytest
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import ValidationError
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+from conftest import FLOOFF_LEXICON, REPO_ROOT
+
 SCHEMA_PATH = REPO_ROOT / "schema" / "lexicon.v1.schema.json"
-FIXTURE_PATH = REPO_ROOT / "examples" / "flooff.lexicon.json"
 VALID_CORPUS = REPO_ROOT / "schema" / "fixtures" / "valid"
 INVALID_CORPUS = REPO_ROOT / "schema" / "fixtures" / "invalid"
 
@@ -31,7 +31,7 @@ def validator() -> Draft202012Validator:
 def test_flooff_fixture_lexicon_passes_the_published_schema(
     validator: Draft202012Validator,
 ) -> None:
-    validator.validate(load(FIXTURE_PATH))
+    validator.validate(load(FLOOFF_LEXICON))
 
 
 def test_every_valid_corpus_fixture_passes_the_published_schema(
@@ -60,7 +60,7 @@ def test_every_structurally_invalid_fixture_is_rejected_by_the_schema_too(
 
 
 def test_flooff_fixture_maps_the_surface_form_flooff_to_canonical_id_product() -> None:
-    lexicon = load(FIXTURE_PATH)
+    lexicon = load(FLOOFF_LEXICON)
 
     assert lexicon["defaultLocale"] == "de-DE"
     assert (
@@ -75,7 +75,7 @@ def test_a_document_that_passes_the_schema_also_loads_in_core(
     """The ADR 0003 equivalence guarantee: schema-pass implies core-load."""
     from lexiqr import EntityResolver
 
-    document = load(FIXTURE_PATH)
+    document = load(FLOOFF_LEXICON)
     validator.validate(document)
 
     report = EntityResolver.from_dict(document).transform("wo ist flooff", "de-DE")
@@ -86,7 +86,7 @@ def test_a_document_that_passes_the_schema_also_loads_in_core(
 def test_a_lexicon_without_a_schema_version_is_rejected(
     validator: Draft202012Validator,
 ) -> None:
-    lexicon = load(FIXTURE_PATH)
+    lexicon = load(FLOOFF_LEXICON)
     del lexicon["schemaVersion"]
 
     with pytest.raises(ValidationError):

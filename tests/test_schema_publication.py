@@ -14,7 +14,8 @@ from typing import Any
 
 import pytest
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+from conftest import REPO_ROOT
+
 SCHEMA_PATH = REPO_ROOT / "schema" / "lexicon.v1.schema.json"
 PUBLICATION = REPO_ROOT / "schema" / "published.json"
 AUTHORING_DOC = REPO_ROOT / "docs" / "lexicon-authoring.md"

@@ -9,6 +9,7 @@ each is locked here as a deliberate behavior decision, verified stable rather
 than left to iteration order.
 """
 
+from conftest import lexicon_document
 from lexiqr import EntityResolver
 
 
@@ -17,20 +18,13 @@ def test_two_forms_of_one_entity_that_fold_alike_resolve_by_declaration_order() 
     # "cafe": same span, same tier, same entity. The index keeps the
     # first-declared, so the first alternate wins — deterministically, on every
     # run and machine — rather than a second candidate reaching the resolver.
-    document = {
-        "schemaVersion": "1",
-        "defaultLocale": "de-DE",
-        "entities": {
-            "product": {
-                "locales": {
-                    "de-DE": {
-                        "preferred": {"singular": "widget"},
-                        "alternates": ["café", "cafe"],
-                    }
-                }
-            }
+    document = lexicon_document(
+        "de-DE",
+        product={
+            "preferred": {"singular": "widget"},
+            "alternates": ["café", "cafe"],
         },
-    }
+    )
     resolver = EntityResolver.from_dict(document)
 
     report = resolver.transform("ich mag café heute", "de-DE")
@@ -45,14 +39,11 @@ def test_two_entities_whose_forms_fold_alike_resolve_by_lower_canonical_id() -> 
     # (their casefolds differ), so both reach the overlap resolver claiming the
     # same span at the same tier. Rule 4 breaks it on the lower canonical ID:
     # "bistro" < "diner", every time.
-    document = {
-        "schemaVersion": "1",
-        "defaultLocale": "de-DE",
-        "entities": {
-            "diner": {"locales": {"de-DE": {"preferred": {"singular": "café"}}}},
-            "bistro": {"locales": {"de-DE": {"preferred": {"singular": "cafe"}}}},
-        },
-    }
+    document = lexicon_document(
+        "de-DE",
+        diner={"preferred": {"singular": "café"}},
+        bistro={"preferred": {"singular": "cafe"}},
+    )
     resolver = EntityResolver.from_dict(document)
 
     report = resolver.transform("das café dort", "de-DE")

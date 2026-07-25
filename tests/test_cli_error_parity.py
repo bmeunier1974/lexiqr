@@ -22,10 +22,10 @@ from pathlib import Path
 
 import pytest
 
+from conftest import REPO_ROOT
 from lexiqr import EntityResolver, ValidationError
 from lexiqr.cli import EXIT_INVALID_LEXICON, main
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
 INVALID_CORPUS = REPO_ROOT / "schema" / "fixtures" / "invalid"
 
 

@@ -10,13 +10,10 @@ the surface is a decision someone takes in this file, and any name that reaches
 `lexiqr.__all__` without being written here fails as the accidental export it is.
 """
 
-from pathlib import Path
-
 import pytest
 
 import lexiqr
-
-FLOOFF = Path(__file__).resolve().parent.parent / "examples" / "flooff.lexicon.json"
+from conftest import FLOOFF_LEXICON
 
 #: Every name lexiqr exports, and nothing else. Adding one is a minor release;
 #: removing or reshaping one is a major release (README → Versioning and
@@ -91,7 +88,7 @@ def test_coordinates_a_failure_does_not_have_are_none() -> None:
 def test_a_lexicon_loads_and_validates_through_exported_names_alone() -> None:
     from lexiqr import Lexicon, SurfaceForms
 
-    lexicon = Lexicon.from_file(FLOOFF)
+    lexicon = Lexicon.from_file(FLOOFF_LEXICON)
 
     assert lexicon.default_locale == "de-DE"
     forms = lexicon.entities["product"]["de-DE"]
@@ -112,7 +109,7 @@ def test_loading_an_invalid_lexicon_faults_where_the_document_is_wrong() -> None
 def test_a_resolver_is_built_from_a_lexicon_the_caller_already_holds() -> None:
     from lexiqr import EntityResolver, Lexicon
 
-    resolver = EntityResolver(Lexicon.from_file(FLOOFF))
+    resolver = EntityResolver(Lexicon.from_file(FLOOFF_LEXICON))
 
     assert resolver.transform("wo ist flooff", "de-DE").matches[0].canonical_id == (
         "product"

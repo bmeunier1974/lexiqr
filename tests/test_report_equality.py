@@ -8,9 +8,9 @@ it ever reaches the matrix — and so the golden can never silently rot.
 
 import subprocess
 import sys
-from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+from conftest import REPO_ROOT
+
 SCRIPT = REPO_ROOT / "scripts" / "report_equality.py"
 
 

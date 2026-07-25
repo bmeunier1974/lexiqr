@@ -4,15 +4,11 @@ import ast
 import shutil
 import subprocess
 import sys
-from pathlib import Path
 
 import pytest
 
 import lexiqr
-
-FIXTURE_PATH = (
-    Path(__file__).resolve().parent.parent / "examples" / "flooff.lexicon.json"
-)
+from conftest import FLOOFF_LEXICON, REPO_ROOT
 
 
 def run_cli(*args: str) -> subprocess.CompletedProcess[str]:
@@ -43,7 +39,7 @@ def test_lexiqr_is_installed_as_a_console_entry_point() -> None:
 
 
 def test_lexiqr_try_prints_the_match_report_and_exits_zero() -> None:
-    result = run_cli("try", str(FIXTURE_PATH), "--locale", "de-DE", "wo ist flooff")
+    result = run_cli("try", str(FLOOFF_LEXICON), "--locale", "de-DE", "wo ist flooff")
 
     assert result.returncode == 0
     assert "product" in result.stdout
@@ -59,7 +55,7 @@ def test_the_cli_reaches_only_for_lexiqrs_documented_public_api() -> None:
     reach into a private core submodule (``from lexiqr.matcher import ...``),
     fails here on the first offence rather than at review time.
     """
-    cli_package = Path(__file__).resolve().parent.parent / "src" / "lexiqr" / "cli"
+    cli_package = REPO_ROOT / "src" / "lexiqr" / "cli"
     public_api = set(lexiqr.__all__)
 
     violations: list[str] = []

@@ -11,19 +11,13 @@ from typing import Any
 
 import pytest
 
+from conftest import flooff_document, lexicon_document
 from lexiqr import (
     MAX_SURFACE_FORM_LENGTH,
     EntityResolver,
     Lexicon,
     ValidationError,
 )
-
-REPO_ROOT = Path(__file__).resolve().parent.parent
-FLOOFF = REPO_ROOT / "examples" / "flooff.lexicon.json"
-
-
-def flooff_document() -> Any:
-    return json.loads(FLOOFF.read_text(encoding="utf-8"))
 
 
 def with_alternate(alternate: str) -> Any:
@@ -35,13 +29,9 @@ def with_alternate(alternate: str) -> Any:
 
 def authored_in(tag: str) -> dict[str, Any]:
     """A one-entity lexicon whose only locale key is `tag`."""
-    return {
-        "schemaVersion": "1",
-        "defaultLocale": "de-DE",
-        "entities": {
-            "product": {"locales": {tag: {"preferred": {"singular": "flooff"}}}}
-        },
-    }
+    return lexicon_document(
+        tag, default_locale="de-DE", product={"preferred": {"singular": "flooff"}}
+    )
 
 
 def test_a_lexicon_declaring_an_unsupported_schema_version_is_rejected() -> None:

@@ -11,9 +11,9 @@ from pathlib import Path
 
 import pytest
 
+from conftest import REPO_ROOT
 from lexiqr import EntityResolver, ValidationError
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
 SEMANTIC_CORPUS = REPO_ROOT / "schema" / "fixtures" / "semantic"
 
 

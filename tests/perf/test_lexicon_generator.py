@@ -13,6 +13,7 @@ import json
 import jsonschema
 import pytest
 
+from conftest import REPO_ROOT
 from lexiqr import EntityResolver, ValidationError
 from perf.lexicon_generator import (
     BENCHMARK_SEED,
@@ -21,7 +22,7 @@ from perf.lexicon_generator import (
     serialize_lexicon,
 )
 
-REPO_ROOT_SCHEMA = "schema/lexicon.v1.schema.json"
+PUBLISHED_SCHEMA = REPO_ROOT / "schema" / "lexicon.v1.schema.json"
 
 
 def test_generating_twice_with_the_same_seed_is_byte_identical() -> None:
@@ -72,13 +73,7 @@ def test_a_different_seed_produces_a_different_lexicon() -> None:
 
 
 def test_the_generated_lexicon_validates_against_the_published_schema() -> None:
-    from pathlib import Path
-
-    schema = json.loads(
-        (Path(__file__).resolve().parents[2] / REPO_ROOT_SCHEMA).read_text(
-            encoding="utf-8"
-        )
-    )
+    schema = json.loads(PUBLISHED_SCHEMA.read_text(encoding="utf-8"))
     lexicon = generate_benchmark_lexicon(seed=BENCHMARK_SEED)
 
     jsonschema.Draft202012Validator(schema).validate(lexicon)

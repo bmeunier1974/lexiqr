@@ -13,14 +13,8 @@ from typing import Any
 
 import pytest
 
+from conftest import FLOOFF_LEXICON, flooff_document
 from lexiqr.cli import main
-
-REPO_ROOT = Path(__file__).resolve().parent.parent
-FLOOFF = REPO_ROOT / "examples" / "flooff.lexicon.json"
-
-
-def valid_document() -> Any:
-    return json.loads(FLOOFF.read_text(encoding="utf-8"))
 
 
 def write(tmp_path: Path, document: Any) -> Path:
@@ -32,7 +26,7 @@ def write(tmp_path: Path, document: Any) -> Path:
 def test_validate_confirms_a_valid_lexicon_on_stdout_and_exits_zero(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    code = main(["validate", str(FLOOFF)])
+    code = main(["validate", str(FLOOFF_LEXICON)])
 
     captured = capsys.readouterr()
     assert code == 0
@@ -43,7 +37,7 @@ def test_validate_confirms_a_valid_lexicon_on_stdout_and_exits_zero(
 def test_validate_reports_an_invalid_lexicon_on_stderr_and_exits_nonzero(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    document = valid_document()
+    document = flooff_document()
     del document["entities"]["product"]["locales"]["de-DE"]["preferred"]["singular"]
     path = write(tmp_path, document)
 
@@ -104,7 +98,7 @@ def test_missing_file_and_bad_json_share_one_distinguishable_exit_code(
 def test_an_invalid_lexicon_is_a_different_exit_code_than_a_cli_level_failure(
     tmp_path: Path,
 ) -> None:
-    document = valid_document()
+    document = flooff_document()
     document["schemaVersion"] = "99"
     invalid_code = main(["validate", str(write(tmp_path, document))])
 

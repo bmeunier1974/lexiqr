@@ -7,29 +7,14 @@ the order candidates were generated in; those are the fuzzy pass's private
 business and are free to change.
 """
 
-import json
 from pathlib import Path
-from typing import Any
 
+from conftest import FLOOFF_LEXICON, REPO_ROOT, flooff_document, lexicon_document
 from lexiqr import EntityResolver, Lexicon, ScoreTier
-
-REPO_ROOT = Path(__file__).resolve().parent.parent
-FLOOFF = REPO_ROOT / "examples" / "flooff.lexicon.json"
-
-
-def one_entity(locale: str, canonical_id: str, singular: str) -> dict[str, Any]:
-    """A one-entity lexicon, so a test states exactly the surface form it means."""
-    return {
-        "schemaVersion": "1",
-        "defaultLocale": locale,
-        "entities": {
-            canonical_id: {"locales": {locale: {"preferred": {"singular": singular}}}}
-        },
-    }
 
 
 def test_a_fuzzy_match_carries_the_same_fields_an_exact_match_does() -> None:
-    resolver = EntityResolver.from_file(FLOOFF)
+    resolver = EntityResolver.from_file(FLOOFF_LEXICON)
 
     fuzzy = resolver.transform("wo ist floof", "de-DE").matches[0]
     exact = resolver.transform("wo ist flooff", "de-DE").matches[0]
@@ -42,13 +27,15 @@ def test_a_fuzzy_match_carries_the_same_fields_an_exact_match_does() -> None:
 
 
 def test_an_exact_match_carries_no_correction() -> None:
-    report = EntityResolver.from_file(FLOOFF).transform("wo ist flooff", "de-DE")
+    report = EntityResolver.from_file(FLOOFF_LEXICON).transform(
+        "wo ist flooff", "de-DE"
+    )
 
     assert report.matches[0].correction is None
 
 
 def test_a_fuzzy_match_records_what_was_typed_and_resolves_the_declared_form() -> None:
-    report = EntityResolver.from_file(FLOOFF).transform("wo ist floof", "de-DE")
+    report = EntityResolver.from_file(FLOOFF_LEXICON).transform("wo ist floof", "de-DE")
     match = report.matches[0]
 
     assert match.correction == "floof"
@@ -57,7 +44,9 @@ def test_a_fuzzy_match_records_what_was_typed_and_resolves_the_declared_form() -
 
 def test_a_fuzzy_span_indexes_the_original_prompt_across_a_stripped_accent() -> None:
     # "prämie" folds to "pramie"; a transposed "prämei" is a near-miss of it.
-    resolver = EntityResolver.from_dict(one_entity("de-DE", "bonus", "prämie"))
+    resolver = EntityResolver.from_dict(
+        lexicon_document("de-DE", bonus={"preferred": {"singular": "prämie"}})
+    )
 
     match = resolver.transform("die prämei buchen", "de-DE").matches[0]
     start, end = match.span
@@ -71,7 +60,9 @@ def test_a_fuzzy_span_survives_a_fold_that_changes_the_length() -> None:
     # "ß" folds to "ss", so "straaße" folds to the eight-char "straasse", a
     # near-miss of the seven-char "strasse". The span must still point back at
     # the seven-char word the user actually typed.
-    resolver = EntityResolver.from_dict(one_entity("de-DE", "street", "strasse"))
+    resolver = EntityResolver.from_dict(
+        lexicon_document("de-DE", street={"preferred": {"singular": "strasse"}})
+    )
 
     match = resolver.transform("die straaße entlang", "de-DE").matches[0]
     start, end = match.span
@@ -82,14 +73,20 @@ def test_a_fuzzy_span_survives_a_fold_that_changes_the_length() -> None:
 
 
 def test_a_word_beyond_the_budget_returns_no_match_rather_than_a_wrong_one() -> None:
-    report = EntityResolver.from_file(FLOOFF).transform("wo ist knurbel", "de-DE")
+    report = EntityResolver.from_file(FLOOFF_LEXICON).transform(
+        "wo ist knurbel", "de-DE"
+    )
 
     assert report.matches == ()
 
 
 def resolves(locale: str, canonical_id: str, singular: str, prompt: str) -> bool:
     """Whether `prompt` resolves to `canonical_id` through the fuzzy pass."""
-    resolver = EntityResolver.from_dict(one_entity(locale, canonical_id, singular))
+    resolver = EntityResolver.from_dict(
+        lexicon_document(
+            locale, entities={canonical_id: {"preferred": {"singular": singular}}}
+        )
+    )
     matches = resolver.transform(prompt, locale).matches
     return any(match.canonical_id == canonical_id for match in matches)
 
@@ -140,13 +137,13 @@ def test_a_candidate_within_budget_but_below_similarity_does_not_resolve() -> No
 
 
 def test_fuzzy_is_on_by_default_so_a_typo_resolves_without_configuration() -> None:
-    report = EntityResolver.from_file(FLOOFF).transform("wo ist floof", "de-DE")
+    report = EntityResolver.from_file(FLOOFF_LEXICON).transform("wo ist floof", "de-DE")
 
     assert report.matches[0].correction == "floof"
 
 
 def test_fuzzy_false_turns_off_tolerance_but_keeps_exact_matching() -> None:
-    resolver = EntityResolver.from_file(FLOOFF, fuzzy=False)
+    resolver = EntityResolver.from_file(FLOOFF_LEXICON, fuzzy=False)
 
     assert resolver.transform("wo ist floof", "de-DE").matches == ()
     exact = resolver.transform("wo ist flooff", "de-DE")
@@ -154,7 +151,7 @@ def test_fuzzy_false_turns_off_tolerance_but_keeps_exact_matching() -> None:
 
 
 def test_fuzzy_false_produces_no_correction_anywhere() -> None:
-    resolver = EntityResolver.from_file(FLOOFF, fuzzy=False)
+    resolver = EntityResolver.from_file(FLOOFF_LEXICON, fuzzy=False)
 
     report = resolver.transform("wo ist flooff und floof", "de-DE")
 
@@ -163,10 +160,10 @@ def test_fuzzy_false_produces_no_correction_anywhere() -> None:
 
 
 def test_the_fuzzy_keyword_is_accepted_on_every_construction_path() -> None:
-    document = json.loads(FLOOFF.read_text(encoding="utf-8"))
+    document = flooff_document()
 
     resolvers = (
-        EntityResolver.from_file(FLOOFF, fuzzy=False),
+        EntityResolver.from_file(FLOOFF_LEXICON, fuzzy=False),
         EntityResolver.from_dict(document, fuzzy=False),
         EntityResolver(Lexicon.from_dict(document), fuzzy=False),
     )
@@ -177,7 +174,9 @@ def test_the_fuzzy_keyword_is_accepted_on_every_construction_path() -> None:
 
 def test_a_two_word_form_resolves_when_one_word_is_misspelled() -> None:
     resolver = EntityResolver.from_dict(
-        one_entity("en-GB", "escalation", "support ticket")
+        lexicon_document(
+            "en-GB", escalation={"preferred": {"singular": "support ticket"}}
+        )
     )
 
     report = resolver.transform("open a support tickte now", "en-GB")
@@ -191,7 +190,9 @@ def test_a_two_word_form_resolves_when_one_word_is_misspelled() -> None:
 
 def test_a_two_word_form_resolves_when_its_words_are_swapped() -> None:
     resolver = EntityResolver.from_dict(
-        one_entity("en-GB", "escalation", "support ticket")
+        lexicon_document(
+            "en-GB", escalation={"preferred": {"singular": "support ticket"}}
+        )
     )
 
     report = resolver.transform("open a ticket support now", "en-GB")
@@ -205,7 +206,9 @@ def test_a_two_word_form_resolves_when_its_words_are_swapped() -> None:
 
 def test_a_two_word_form_obeys_the_same_budget_as_a_single_word() -> None:
     resolver = EntityResolver.from_dict(
-        one_entity("en-GB", "escalation", "support ticket")
+        lexicon_document(
+            "en-GB", escalation={"preferred": {"singular": "support ticket"}}
+        )
     )
 
     # Two edits is within the fourteen-character form's budget of two.
@@ -217,24 +220,12 @@ def test_a_two_word_form_obeys_the_same_budget_as_a_single_word() -> None:
     assert beyond.matches == ()
 
 
-def lexicon_of(locale: str, **entities: dict[str, Any]) -> dict[str, Any]:
-    """A multi-entity lexicon, so a test can pit two surface forms against a typo."""
-    return {
-        "schemaVersion": "1",
-        "defaultLocale": locale,
-        "entities": {
-            canonical_id: {"locales": {locale: forms}}
-            for canonical_id, forms in entities.items()
-        },
-    }
-
-
 def test_a_higher_similarity_candidate_wins_even_at_a_greater_edit_distance() -> None:
     # "widteg" is two edits from "widget" but more similar (0.96); "wedget" is
     # one edit but less similar (0.90). Similarity is asked first, so the more
     # similar candidate wins despite its greater distance.
     resolver = EntityResolver.from_dict(
-        lexicon_of(
+        lexicon_document(
             "en-GB",
             near={"preferred": {"singular": "widteg"}},
             far={"preferred": {"singular": "wedget"}},
@@ -250,7 +241,7 @@ def test_candidates_tied_on_similarity_are_separated_by_lower_edit_distance() ->
     # "widmet" and "widetu" are equally similar to "widget" (0.9222); the
     # one-edit "widmet" beats the two-edit "widetu".
     resolver = EntityResolver.from_dict(
-        lexicon_of(
+        lexicon_document(
             "en-GB",
             close={"preferred": {"singular": "widmet"}},
             distant={"preferred": {"singular": "widetu"}},
@@ -266,7 +257,7 @@ def test_candidates_tied_on_similarity_and_distance_are_separated_by_tier() -> N
     # Both forms are one edit and equally similar to "widget"; the preferred
     # form outranks the alternate one.
     resolver = EntityResolver.from_dict(
-        lexicon_of(
+        lexicon_document(
             "en-GB",
             preferred_owner={"preferred": {"singular": "widgat"}},
             alternate_owner={
@@ -283,7 +274,7 @@ def test_candidates_tied_on_similarity_and_distance_are_separated_by_tier() -> N
 
 def test_equally_good_matches_are_reported_in_earliest_start_order() -> None:
     resolver = EntityResolver.from_dict(
-        lexicon_of(
+        lexicon_document(
             "en-GB",
             product={"preferred": {"singular": "widget"}},
             gizmo={"preferred": {"singular": "gadget"}},
@@ -300,7 +291,7 @@ def test_equally_good_matches_are_reported_in_earliest_start_order() -> None:
 def test_an_ambiguous_typo_returns_the_same_correction_on_every_run() -> None:
     # Two forms equally close to "widget" in every ranked dimension: the tie is
     # broken by the lower canonical ID, and identically on every run.
-    document = lexicon_of(
+    document = lexicon_document(
         "en-GB",
         aardvark={"preferred": {"singular": "widgat"}},
         buffalo={"preferred": {"singular": "widgbt"}},

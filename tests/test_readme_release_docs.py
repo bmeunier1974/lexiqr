@@ -6,11 +6,10 @@ and the multi-tenant recipe that must stay illustrative. These are drift guards
 on the front page, in the repo's convention of testing load-bearing docs.
 """
 
-from pathlib import Path
-
 from quickstart_extractor import extract_quickstart
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+from conftest import REPO_ROOT
+
 README = REPO_ROOT / "README.md"
 
 

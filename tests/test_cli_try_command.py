@@ -14,6 +14,7 @@ from typing import Any
 
 import pytest
 
+from conftest import FLOOFF_LEXICON, flooff_document
 from lexiqr.cli import (
     EXIT_CLI_ERROR,
     EXIT_INVALID_LEXICON,
@@ -21,13 +22,6 @@ from lexiqr.cli import (
     EXIT_OK,
     main,
 )
-
-REPO_ROOT = Path(__file__).resolve().parent.parent
-FLOOFF = REPO_ROOT / "examples" / "flooff.lexicon.json"
-
-
-def valid_document() -> Any:
-    return json.loads(FLOOFF.read_text(encoding="utf-8"))
 
 
 def write(tmp_path: Path, document: Any) -> Path:
@@ -39,7 +33,7 @@ def write(tmp_path: Path, document: Any) -> Path:
 def test_try_prints_the_match_report_on_stdout_and_exits_zero(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    code = main(["try", str(FLOOFF), "--locale", "de-DE", "wo ist flooff"])
+    code = main(["try", str(FLOOFF_LEXICON), "--locale", "de-DE", "wo ist flooff"])
 
     captured = capsys.readouterr()
     assert code == EXIT_OK
@@ -51,7 +45,7 @@ def test_try_prints_the_match_report_on_stdout_and_exits_zero(
 def test_try_on_a_prompt_that_matches_nothing_says_so_and_exits_nonzero(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    code = main(["try", str(FLOOFF), "--locale", "de-DE", "nichts hier"])
+    code = main(["try", str(FLOOFF_LEXICON), "--locale", "de-DE", "nichts hier"])
 
     captured = capsys.readouterr()
     assert code == EXIT_NO_MATCH
@@ -63,7 +57,7 @@ def test_try_on_a_prompt_that_matches_nothing_says_so_and_exits_nonzero(
 def test_try_on_an_invalid_lexicon_renders_validation_errors_not_a_match_failure(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    document = valid_document()
+    document = flooff_document()
     del document["entities"]["product"]["locales"]["de-DE"]["preferred"]["singular"]
     path = write(tmp_path, document)
 
@@ -78,11 +72,11 @@ def test_try_on_an_invalid_lexicon_renders_validation_errors_not_a_match_failure
 def test_the_load_failure_code_is_distinct_from_the_no_match_code(
     tmp_path: Path,
 ) -> None:
-    document = valid_document()
+    document = flooff_document()
     document["schemaVersion"] = "99"
     invalid = main(["try", str(write(tmp_path, document)), "--locale", "de-DE", "x"])
 
-    no_match = main(["try", str(FLOOFF), "--locale", "de-DE", "nichts"])
+    no_match = main(["try", str(FLOOFF_LEXICON), "--locale", "de-DE", "nichts"])
 
     assert invalid != no_match
     assert invalid == EXIT_INVALID_LEXICON

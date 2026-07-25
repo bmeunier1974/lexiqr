@@ -6,7 +6,9 @@ introduces no type errors and no `Any` leaks — so these tests build the wheel,
 install it into a throwaway project, and type-check *that*.
 
 They are slower than the rest of the suite on purpose: this is the only place
-the guarantee is checked the way a user experiences it.
+the guarantee is checked the way a user experiences it. The wheel they install
+is the session-scoped one from conftest — the same artifact the packaging tests
+inspect, built once for the whole run.
 """
 
 import subprocess
@@ -14,23 +16,6 @@ import zipfile
 from pathlib import Path
 
 import pytest
-
-REPO_ROOT = Path(__file__).resolve().parent.parent
-
-
-@pytest.fixture(scope="module")
-def wheel(tmp_path_factory: pytest.TempPathFactory) -> Path:
-    """The distribution a consumer would actually install."""
-    out = tmp_path_factory.mktemp("dist")
-    subprocess.run(
-        ["uv", "build", "--wheel", "--out-dir", str(out)],
-        cwd=REPO_ROOT,
-        check=True,
-        capture_output=True,
-    )
-    built = list(out.glob("*.whl"))
-    assert len(built) == 1, built
-    return built[0]
 
 
 def test_the_marker_that_makes_the_types_visible_ships_in_the_wheel(

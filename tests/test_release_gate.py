@@ -2,9 +2,10 @@
 
 import subprocess
 import sys
-from pathlib import Path
 
-SCRIPT = Path(__file__).resolve().parent.parent / "scripts" / "reproduce_flooff.py"
+from conftest import REPO_ROOT
+
+SCRIPT = REPO_ROOT / "scripts" / "reproduce_flooff.py"
 
 
 def test_the_install_verification_script_reproduces_the_flooff_match() -> None:
