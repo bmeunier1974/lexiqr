@@ -24,8 +24,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from lexiqr.errors import MalformedDocumentError, ValidationError
+from lexiqr.errors import MalformedDocumentError, ValidationError, kind
 from lexiqr.locale import is_well_formed
+from lexiqr.metadata import EMPTY, Metadata, MetadataFault
 
 #: The one lexicon format version core implements (ADR 0003).
 SCHEMA_VERSION = "1"
@@ -52,7 +53,7 @@ _IDENTIFIER = re.compile(r"^[A-Za-z0-9_.-]+$")
 #: bans. A key outside these is a typo, and a typo silently ignored is a
 #: surface form the tenant believes is live and isn't.
 _DOCUMENT_KEYS = frozenset({"$schema", "schemaVersion", "defaultLocale", "entities"})
-_ENTITY_KEYS = frozenset({"canonicalId", "locales"})
+_ENTITY_KEYS = frozenset({"canonicalId", "locales", "metadata"})
 _SURFACE_FORM_KEYS = frozenset({"preferred", "alternates"})
 _PREFERRED_KEYS = frozenset({"singular", "plural"})
 
@@ -81,6 +82,10 @@ class Entry:
     entry_id: str
     canonical_id: str
     locales: dict[str, SurfaceForms]
+    #: The filter that tells this entry's entity from another entry's. Empty
+    #: rather than absent when the entry declares none, so nothing downstream
+    #: needs a guard.
+    metadata: Metadata = EMPTY
 
 
 @dataclass(frozen=True)
@@ -117,7 +122,7 @@ class Lexicon:
         if not isinstance(entities, dict):
             raise _fault(
                 "entities",
-                f"must be an object keyed by entry ID, not {_kind(entities)}",
+                f"must be an object keyed by entry ID, not {kind(entities)}",
             )
         if not entities:
             raise _fault(
@@ -165,7 +170,7 @@ def _entry(entity: Any, entry_id: str) -> Entry:
     if not isinstance(entity, dict):
         raise _fault(
             "entities",
-            f"maps {entry_id!r} to {_kind(entity)}, not an entity object",
+            f"maps {entry_id!r} to {kind(entity)}, not an entity object",
             canonical_id=entry_id,
         )
     if not _IDENTIFIER.fullmatch(entry_id):
@@ -191,7 +196,21 @@ def _entry(entity: Any, entry_id: str) -> Entry:
         entry_id=entry_id,
         canonical_id=canonical_id,
         locales=_locales(entity, entry_id),
+        metadata=_metadata(entity.get("metadata"), entry_id),
     )
+
+
+def _metadata(declared: Any, entry_id: str) -> Metadata:
+    """The entry's filter, with the coordinates only this module knows added.
+
+    `lexiqr.metadata` owns what a filter may be; the loader owns where in the
+    document a bad one was found. The two meet here, so the message reads with the
+    same voice as every other validation error.
+    """
+    try:
+        return Metadata.of(declared)
+    except MetadataFault as fault:
+        raise _fault(fault.field, fault.reason, canonical_id=entry_id) from fault
 
 
 def _locales(entity: dict[str, Any], canonical_id: str) -> dict[str, SurfaceForms]:
@@ -199,7 +218,7 @@ def _locales(entity: dict[str, Any], canonical_id: str) -> dict[str, SurfaceForm
     if not isinstance(locales, dict):
         raise _fault(
             "locales",
-            f"must be an object keyed by locale tag, not {_kind(locales)}",
+            f"must be an object keyed by locale tag, not {kind(locales)}",
             canonical_id=canonical_id,
         )
     if not locales:
@@ -230,7 +249,7 @@ def _surface_forms(forms: Any, canonical_id: str, locale: str) -> SurfaceForms:
         return _fault(field, reason, canonical_id=canonical_id, locale=locale)
 
     if not isinstance(forms, dict):
-        raise fault("locales", f"maps {locale!r} to {_kind(forms)}, not surface forms")
+        raise fault("locales", f"maps {locale!r} to {kind(forms)}, not surface forms")
     _reject_unknown_keys(
         forms,
         _SURFACE_FORM_KEYS,
@@ -241,7 +260,7 @@ def _surface_forms(forms: Any, canonical_id: str, locale: str) -> SurfaceForms:
 
     preferred = forms.get("preferred")
     if not isinstance(preferred, dict):
-        raise fault("preferred", f"must be an object, not {_kind(preferred)}")
+        raise fault("preferred", f"must be an object, not {kind(preferred)}")
     _reject_unknown_keys(
         preferred,
         _PREFERRED_KEYS,
@@ -254,9 +273,7 @@ def _surface_forms(forms: Any, canonical_id: str, locale: str) -> SurfaceForms:
 
     alternates = forms.get("alternates", [])
     if not isinstance(alternates, list):
-        raise fault(
-            "alternates", f"must be an array of labels, not {_kind(alternates)}"
-        )
+        raise fault("alternates", f"must be an array of labels, not {kind(alternates)}")
 
     named_forms = [("preferred.singular", preferred["singular"])]
     if "plural" in preferred:
@@ -267,7 +284,7 @@ def _surface_forms(forms: Any, canonical_id: str, locale: str) -> SurfaceForms:
     ]
     for field, surface_form in named_forms:
         if not isinstance(surface_form, str):
-            raise fault(field, f"must be a label, not {_kind(surface_form)}")
+            raise fault(field, f"must be a label, not {kind(surface_form)}")
         if not surface_form:
             raise fault(field, "is empty; a surface form nobody can type is a bug")
         # Beyond the schema, whose minLength cannot tell a label from a blank
@@ -434,16 +451,3 @@ def _reject_unknown_keys(
             canonical_id=canonical_id,
             locale=locale,
         )
-
-
-def _kind(value: Any) -> str:
-    """The JSON name for what a value turned out to be, for error messages."""
-    return {
-        dict: "an object",
-        list: "an array",
-        str: "a string",
-        bool: "a boolean",
-        int: "a number",
-        float: "a number",
-        type(None): "null",
-    }.get(type(value), f"a {type(value).__name__}")

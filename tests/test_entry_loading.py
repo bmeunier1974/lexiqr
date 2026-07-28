@@ -157,3 +157,72 @@ def test_a_canonical_id_outside_the_identifier_grammar_is_rejected(
     assert identifier in raised.value.message
     assert raised.value.canonical_id == "movie"
     assert raised.value.field == "canonicalId"
+
+
+def test_an_entry_holds_the_filter_it_declared() -> None:
+    """The authoring path: what the tenant wrote is what core holds.
+
+    The filter is what tells one `product` entry from another. lexiqr carries it
+    and never reads it — what `productType = Movie` means to a search backend
+    stays in the consuming service.
+    """
+    lexicon = Lexicon.from_dict(
+        lexicon_document(
+            "de-DE",
+            movie=entry(
+                "film", canonicalId="product", metadata={"productType": "Movie"}
+            ),
+        )
+    )
+
+    assert dict(lexicon.entries["movie"].metadata) == {"productType": "Movie"}
+
+
+def test_an_entry_that_declares_no_filter_carries_an_empty_one() -> None:
+    """Absent is empty, not missing, so nothing downstream needs a guard."""
+    lexicon = Lexicon.from_dict(lexicon_document("de-DE", product=entry("flooff")))
+
+    assert lexicon.entries["product"].metadata == {}
+
+
+def test_two_entries_of_one_entity_may_declare_different_filter_keys() -> None:
+    """A deliberate permission, pinned so it stays a decision.
+
+    A more specific entry reasonably carries a more specific filter: a
+    streamable-only "movie" says so, and the plain "series" has nothing to say
+    about it. Requiring the key sets to agree would force every entry to carry
+    every other entry's vocabulary.
+    """
+    lexicon = Lexicon.from_dict(
+        lexicon_document(
+            "de-DE",
+            movie=entry(
+                "film",
+                canonicalId="product",
+                metadata={"productType": "Movie", "streamable": True},
+            ),
+            series=entry("serie", canonicalId="product", metadata={"seasons": 3}),
+        )
+    )
+
+    assert [sorted(declared.metadata) for declared in lexicon.entries.values()] == [
+        ["productType", "streamable"],
+        ["seasons"],
+    ]
+
+
+def test_a_blank_filter_value_is_rejected_naming_the_entry_and_the_key() -> None:
+    """An author fixes their file from the message, without reading library source."""
+    with pytest.raises(ValidationError) as raised:
+        Lexicon.from_dict(
+            lexicon_document(
+                "de-DE",
+                movie=entry(
+                    "film", canonicalId="product", metadata={"productType": "   "}
+                ),
+            )
+        )
+
+    assert raised.value.canonical_id == "movie"
+    assert raised.value.field == "metadata.productType"
+    assert "whitespace" in raised.value.message

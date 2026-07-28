@@ -38,7 +38,17 @@ prompt through it, read the report, and handle a bad lexicon.
 
 from pathlib import Path
 
-from lexiqr import EntityMatch, EntityResolver, MatchReport, ScoreTier, ValidationError
+from lexiqr import (
+    EntityMatch,
+    EntityResolver,
+    Entry,
+    Lexicon,
+    MatchReport,
+    Metadata,
+    MetadataValue,
+    ScoreTier,
+    ValidationError,
+)
 
 
 def resolver_for_tenant(lexicon_path: Path) -> EntityResolver:
@@ -73,12 +83,35 @@ def describe(match: EntityMatch) -> str:
     )
 
 
+def search_filter(entry: Entry) -> dict[str, list[str]]:
+    """The jargon-to-filter half of the mapping, read out of a held lexicon.
+
+    A filter value is a scalar or a set of scalars, so a consuming service that
+    wants every value as a list narrows on the type it was handed.
+    """
+    metadata: Metadata = entry.metadata
+    narrowed: dict[str, list[str]] = {}
+    for key in metadata:
+        value: MetadataValue = metadata[key]
+        narrowed[key] = list(value) if isinstance(value, tuple) else [str(value)]
+    return narrowed
+
+
+def filters_by_entry(lexicon_path: Path) -> dict[str, dict[str, list[str]]]:
+    lexicon: Lexicon = Lexicon.from_file(lexicon_path)
+    return {
+        entry.canonical_id: search_filter(entry)
+        for entry in lexicon.entries.values()
+    }
+
+
 def main(lexicon_path: Path, prompt: str, locale: str) -> None:
     resolver: EntityResolver = resolver_for_tenant(lexicon_path)
     report: MatchReport = resolver.transform(prompt, locale)
     print(report.prompt, report.locale, canonical_ids(report))
     for match in report.matches:
         print(describe(match))
+    print(filters_by_entry(lexicon_path))
 '''
 
 MISUSE = """\

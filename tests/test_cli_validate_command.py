@@ -13,8 +13,14 @@ from typing import Any
 
 import pytest
 
-from conftest import FLOOFF_LEXICON, flooff_document
+from conftest import FLOOFF_LEXICON, REPO_ROOT, flooff_document
 from lexiqr.cli import main
+
+#: A lexicon that uses the entry model: two entries resolving to `product`, each
+#: with the filter that tells them apart.
+MEDIEN_SHARED_ENTITY = (
+    REPO_ROOT / "schema" / "fixtures" / "valid" / "medien-shared-entity.lexicon.json"
+)
 
 
 def write(tmp_path: Path, document: Any) -> Path:
@@ -105,3 +111,31 @@ def test_an_invalid_lexicon_is_a_different_exit_code_than_a_cli_level_failure(
     cli_level_code = main(["validate", str(tmp_path / "absent.json")])
 
     assert invalid_code != cli_level_code
+
+
+def test_validate_accepts_a_lexicon_whose_entries_carry_filters(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """The authoring path, end to end: an author checks a file that uses the
+    feature and needs no Python to find out whether it is good."""
+    code = main(["validate", str(MEDIEN_SHARED_ENTITY)])
+
+    assert code == 0
+    assert "valid" in capsys.readouterr().out.lower()
+
+
+def test_validate_names_the_entry_and_the_key_of_a_bad_filter(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The same precision the library raises, rendered — an author fixes their
+    file from this line without opening library source."""
+    document = flooff_document()
+    document["entities"]["product"]["metadata"] = {"productType": "   "}
+    path = write(tmp_path, document)
+
+    code = main(["validate", str(path)])
+
+    captured = capsys.readouterr()
+    assert code == 1
+    assert "product" in captured.err
+    assert "metadata.productType" in captured.err

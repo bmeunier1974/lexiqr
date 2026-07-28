@@ -5,6 +5,7 @@
   "entities": {
     "movie": {
       "canonicalId": "product",
+      "metadata": { "productType": "Movie", "genre": ["drama", "thriller"] },
       "locales": {
         "de-DE": {
           "preferred": { "singular": "film", "plural": "filme" },
@@ -17,6 +18,7 @@
     },
     "series": {
       "canonicalId": "product",
+      "metadata": { "productType": "Series", "episodic": true },
       "locales": {
         "de-DE": {
           "preferred": { "singular": "serie", "plural": "serien" }

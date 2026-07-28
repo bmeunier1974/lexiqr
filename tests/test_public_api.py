@@ -29,6 +29,8 @@ PUBLIC_SURFACE = {
     "MAX_SURFACE_FORM_LENGTH",
     "MalformedDocumentError",
     "MatchReport",
+    "Metadata",
+    "MetadataValue",
     "ScoreTier",
     "SurfaceForms",
     "ValidationError",
@@ -134,6 +136,34 @@ def test_a_lexicon_loads_and_validates_through_exported_names_alone() -> None:
     forms = entry.locales["de-DE"]
     assert isinstance(forms, SurfaceForms)
     assert forms.preferred_singular == "flooff"
+
+
+def test_a_filter_read_off_an_entry_is_a_nameable_immutable_mapping() -> None:
+    """An integrating developer reads filter values, so the type is exported.
+
+    Without it a caller could only annotate what they read as `object`, and the
+    typing guarantee (C10) is that adding lexiqr costs no type errors.
+    """
+    from lexiqr import Lexicon, Metadata
+
+    lexicon = Lexicon.from_dict(
+        {
+            "schemaVersion": "1",
+            "defaultLocale": "de-DE",
+            "entities": {
+                "movie": {
+                    "canonicalId": "product",
+                    "metadata": {"productType": "Movie"},
+                    "locales": {"de-DE": {"preferred": {"singular": "film"}}},
+                }
+            },
+        }
+    )
+
+    metadata = lexicon.entries["movie"].metadata
+
+    assert isinstance(metadata, Metadata)
+    assert metadata["productType"] == "Movie"
 
 
 def test_an_entry_names_itself_and_the_entity_it_resolves_to() -> None:

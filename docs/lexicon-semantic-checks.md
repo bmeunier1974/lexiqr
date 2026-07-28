@@ -112,10 +112,29 @@ match report `movie` — an entity no backend queries — which is the very fail
 the entry model exists to remove. Refusing at load time puts the one-line fix
 where it belongs: name `product` directly.
 
+## 6. A metadata value may not be only whitespace
+
+**Fixture:** `blank-metadata-value.lexicon.json`
+
+`"   "` is a string of length three, so the `metadata` subschema's `minLength: 1`
+accepts it — exactly as it accepts a blank surface form (check 3).
+
+*Why the schema cannot express it.* It could, with a pattern, and it is left out
+for the same reason: a metadata value is tenant-authored text in whatever script
+the tenant writes, and a regex built around Latin assumptions would refuse
+legitimate values. Core carries the check instead.
+
+*Why core rejects.* Metadata is carried onto every match the entry produces and
+read by a consuming service building a query. A value that is only spaces is not
+something a backend can act on, but it is not nothing either: it becomes a live
+filter that silently narrows every query, and the symptom is a search that quietly
+returns less than it should. That is far more expensive to find later than at load
+time.
+
 ---
 
 ## For lexicon authors
 
 If offline validation passes and lexiqr still rejects your file, the error
 message names the entity, locale, and field — and the reason will be one of the
-five above. Nothing else in lexiqr rejects a schema-valid document.
+six above. Nothing else in lexiqr rejects a schema-valid document.
