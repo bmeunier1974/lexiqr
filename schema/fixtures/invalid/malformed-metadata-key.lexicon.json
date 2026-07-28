@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "1",
+  "defaultLocale": "de-DE",
+  "entities": {
+    "movie": {
+      "canonicalId": "product",
+      "metadata": { "product type": "Movie" },
+      "locales": {
+        "de-DE": {
+          "preferred": { "singular": "film" }
+        }
+      }
+    }
+  }
+}

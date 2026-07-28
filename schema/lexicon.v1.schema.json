@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/bmeunier1974/lexiqr/v0.0.1/schema/lexicon.v1.schema.json",
+  "$id": "https://raw.githubusercontent.com/bmeunier1974/lexiqr/v1.1.0/schema/lexicon.v1.schema.json",
   "title": "lexiqr lexicon v1",
   "description": "A tenant's multilingual mapping from company jargon to canonical entities.",
   "type": "object",
@@ -41,6 +41,18 @@
       "required": ["locales"],
       "additionalProperties": false,
       "properties": {
+        "canonicalId": {
+          "description": "The entity this entry resolves to; defaults to the entry's own key. Several entries may name the same entity.",
+          "$ref": "#/$defs/canonicalId"
+        },
+        "metadata": {
+          "description": "Tenant-defined key/value pairs carried verbatim onto every match this entry produces. lexiqr never interprets them.",
+          "type": "object",
+          "minProperties": 1,
+          "maxProperties": 16,
+          "propertyNames": { "pattern": "^[A-Za-z0-9_.-]{1,64}$" },
+          "additionalProperties": { "$ref": "#/$defs/metadataValue" }
+        },
         "locales": {
           "description": "Surface forms per locale.",
           "type": "object",
@@ -76,6 +88,26 @@
     "surfaceForm": {
       "type": "string",
       "minLength": 1
+    },
+    "metadataValue": {
+      "description": "A scalar, or a set of scalars. No null — an absent key already means absent — and no nesting, which would invite a query language lexiqr deliberately does not have.",
+      "oneOf": [
+        { "$ref": "#/$defs/metadataScalar" },
+        { "type": "number" },
+        { "type": "boolean" },
+        {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 16,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/metadataScalar" }
+        }
+      ]
+    },
+    "metadataScalar": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
     }
   }
 }

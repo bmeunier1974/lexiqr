@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "1",
+  "defaultLocale": "de-DE",
+  "entities": {
+    "movie": {
+      "canonicalId": "product",
+      "metadata": { "genre": ["drama", 7] },
+      "locales": {
+        "de-DE": {
+          "preferred": { "singular": "film" }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "schemaVersion": "1",
+  "defaultLocale": "de-DE",
+  "entities": {
+    "movie": {
+      "canonicalId": "product",
+      "metadata": {
+        "filter01": "value01",
+        "filter02": "value02",
+        "filter03": "value03",
+        "filter04": "value04",
+        "filter05": "value05",
+        "filter06": "value06",
+        "filter07": "value07",
+        "filter08": "value08",
+        "filter09": "value09",
+        "filter10": "value10",
+        "filter11": "value11",
+        "filter12": "value12",
+        "filter13": "value13",
+        "filter14": "value14",
+        "filter15": "value15",
+        "filter16": "value16",
+        "filter17": "value17"
+      },
+      "locales": {
+        "de-DE": {
+          "preferred": { "singular": "film" }
+        }
+      }
+    }
+  }
+}

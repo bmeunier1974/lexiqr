@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "1",
+  "defaultLocale": "de-DE",
+  "entities": {
+    "movie": {
+      "canonicalId": "product",
+      "metadata": {
+        "genre": ["genre01", "genre02", "genre03", "genre04", "genre05", "genre06", "genre07", "genre08", "genre09", "genre10", "genre11", "genre12", "genre13", "genre14", "genre15", "genre16", "genre17"]
+      },
+      "locales": {
+        "de-DE": {
+          "preferred": { "singular": "film" }
+        }
+      }
+    }
+  }
+}
