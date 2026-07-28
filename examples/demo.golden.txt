@@ -1,0 +1,18 @@
+lexiqr — a sample run: every claim printed, every claim asserted.
+lexicon: examples/medien.lexicon.json
+
+--- 1. A tenant lexicon loads from a file: validation is construction [C2] ---
+
+claim     Lexicon.from_file either hands back a lexicon lexiqr can trust or raises
+          ValidationError naming where the document is wrong. Validation is
+          construction, so a caller holding a lexicon has nothing left to check.
+lexicon   examples/medien.lexicon.json
+entries   award, broadcast, invoice, movie, series
+entities  award, broadcast, invoice, product
+locales   ar-EG, de-AT, de-DE, en-GB
+default   de-DE
+held      the loader returned rather than raised, and that verdict is the validation.
+          The 5 entries it read resolve to 4 entities, so more than one entry shares an
+          entity, and the declared default is a locale the lexicon really authors.
+
+OK: every section held.

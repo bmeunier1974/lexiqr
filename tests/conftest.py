@@ -8,7 +8,10 @@ plain script — but the release-consistency gate is a *pure* module whose whole
 point is being unit-testable against crafted inputs rather than only observable
 by pushing real tags. Putting the scripts directory on the path lets a test
 import that checker directly, without the subprocess indirection the I/O-bound
-scripts (reproduce_flooff, report_equality) are exercised through.
+scripts (reproduce_flooff, report_equality) are exercised through. `examples/` is
+on the path for the same reason and no other: the sample run is import-safe by
+design, so a test can import it and exercise its render helper directly instead
+of reading lines back out of a subprocess's transcript.
 
 Second, the two paths every test file used to rediscover for itself — the repo
 root and the flooff example lexicon — are named here once, so a directory move
@@ -44,6 +47,7 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
+sys.path.insert(0, str(REPO_ROOT / "examples"))
 
 #: The flooff scenario's published lexicon: "flooff" → `product`, in de-DE.
 FLOOFF_LEXICON = REPO_ROOT / "examples" / "flooff.lexicon.json"

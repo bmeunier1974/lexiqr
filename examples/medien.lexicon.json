@@ -1,0 +1,72 @@
+{
+  "$schema": "https://raw.githubusercontent.com/bmeunier1974/lexiqr/v1.1.0/schema/lexicon.v1.schema.json",
+  "schemaVersion": "1",
+  "defaultLocale": "de-DE",
+  "entities": {
+    "movie": {
+      "canonicalId": "product",
+      "metadata": { "productType": "Movie", "genre": ["drama", "thriller"] },
+      "locales": {
+        "de-DE": {
+          "preferred": { "singular": "film", "plural": "filme" },
+          "alternates": ["spielfilm"]
+        },
+        "en-GB": {
+          "preferred": { "singular": "movie", "plural": "movies" }
+        },
+        "ar-EG": {
+          "preferred": { "singular": "فيلم", "plural": "أفلام" }
+        }
+      }
+    },
+    "series": {
+      "canonicalId": "product",
+      "metadata": { "productType": "Series", "episodic": true },
+      "locales": {
+        "de-DE": {
+          "preferred": { "singular": "serie", "plural": "serien" }
+        },
+        "en-GB": {
+          "preferred": { "singular": "series" }
+        },
+        "ar-EG": {
+          "preferred": { "singular": "مسلسل", "plural": "مسلسلات" }
+        }
+      }
+    },
+    "award": {
+      "locales": {
+        "de-DE": {
+          "preferred": { "singular": "film des jahres" }
+        },
+        "en-GB": {
+          "preferred": { "singular": "film of the year" }
+        }
+      }
+    },
+    "broadcast": {
+      "locales": {
+        "de-DE": {
+          "preferred": { "singular": "übertragung", "plural": "übertragungen" }
+        },
+        "en-GB": {
+          "preferred": { "singular": "broadcast", "plural": "broadcasts" }
+        }
+      }
+    },
+    "invoice": {
+      "locales": {
+        "de-DE": {
+          "preferred": { "singular": "rechnung", "plural": "rechnungen" }
+        },
+        "de-AT": {
+          "preferred": { "singular": "faktura", "plural": "fakturen" }
+        },
+        "en-GB": {
+          "preferred": { "singular": "invoice", "plural": "invoices" },
+          "alternates": ["bill"]
+        }
+      }
+    }
+  }
+}
