@@ -33,8 +33,10 @@ import sys
 from pathlib import Path
 
 import demo
+import pytest
 
 from conftest import REPO_ROOT
+from lexiqr import Lexicon, ValidationError
 
 EXAMPLES = REPO_ROOT / "examples"
 RUN = EXAMPLES / "demo.py"
@@ -53,6 +55,39 @@ def normalize(text: str) -> str:
     A platform's newline convention is not a failure; a wording change is.
     """
     return "\n".join(line.rstrip() for line in text.strip("\n").splitlines()).strip()
+
+
+def collapsed(text: str) -> str:
+    """`text` with its wrapping undone, so a sentence broken across lines is findable.
+
+    The transcript wraps to a fixed width, which puts a line break in the middle
+    of every long value it prints. A test that wants to find a whole sentence in
+    it either has to know where the run wrapped — which is testing the
+    formatter — or flatten the whitespace first. This is the second.
+    """
+    return " ".join(text.split())
+
+
+def transcript_of(section_name: str) -> str:
+    """Just the lines the named section printed, collapsed onto one line.
+
+    A by-name assertion has to look inside the section that makes the claim, not
+    across the whole transcript: `de-DE` appears in half the sections, so
+    "the rejection names the locale" would pass on a run that stopped printing
+    it. The section is found by asking the run which position it declares it in,
+    so renumbering the transcript cannot silently point this at the wrong text.
+    """
+    numbered = [
+        number
+        for number, section in enumerate(demo.SECTIONS, start=1)
+        if section.__name__ == section_name
+    ]
+    assert numbered, f"the run declares no section named {section_name!r}"
+
+    golden = GOLDEN.read_text(encoding="utf-8")
+    marker = f"--- {numbered[0]}. "
+    assert marker in golden, f"{GOLDEN.name} has no section {numbered[0]}: {REGENERATE}"
+    return collapsed(golden.split(marker, 1)[1].split("\n--- ", 1)[0])
 
 
 def run(cwd: Path) -> subprocess.CompletedProcess[str]:
@@ -240,6 +275,28 @@ def test_the_transcript_names_what_the_lexicon_declares() -> None:
     assert ", ".join(entities) in golden, f"the transcript does not name {entities}"
     assert ", ".join(locales) in golden, f"the transcript does not name {locales}"
     assert document["defaultLocale"] in golden
+
+
+def test_the_transcript_names_the_coordinates_the_loader_really_reports() -> None:
+    """The rejection section, pinned to the loader rather than to the rendering.
+
+    The invalid document is taken from the run and handed to the loader here, so
+    the coordinates compared against the transcript are the ones core produces
+    today. If core stopped naming the locale, or renamed the field, a golden
+    regenerated from that state would agree with itself and this would not.
+    """
+    with pytest.raises(ValidationError) as refused:
+        Lexicon.from_dict(demo.A_LEXICON_WITH_A_MISTAKE)
+
+    rejected = refused.value
+    printed = transcript_of("a_rejected_lexicon_names_the_entry_locale_and_field")
+
+    for coordinate in (rejected.canonical_id, rejected.locale, rejected.field):
+        assert coordinate is not None, f"the refusal has no coordinates: {rejected}"
+        assert coordinate in printed, f"the section does not name {coordinate!r}"
+    assert collapsed(str(rejected)) in printed, (
+        f"the section does not carry the message the loader raised: {rejected}"
+    )
 
 
 def test_the_run_records_how_its_golden_is_regenerated() -> None:

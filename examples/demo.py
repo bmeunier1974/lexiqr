@@ -40,9 +40,9 @@ import io
 import sys
 import textwrap
 from pathlib import Path
-from typing import Protocol, cast
+from typing import Any, Protocol, cast
 
-from lexiqr import Lexicon
+from lexiqr import Lexicon, ValidationError
 
 #: The tenant lexicon every section resolves against, found relative to this
 #: file so the working directory is irrelevant.
@@ -147,6 +147,84 @@ def a_lexicon_loads_from_a_file() -> None:
     )
 
 
+#: A lexicon with one ordinary authoring mistake in it: entry "movie" writes its
+#: de-DE alternates as a bare string where the format wants an array of labels.
+#: Written out here, and handed to the loader in memory, so a reader can see
+#: exactly what is being refused without opening a second file.
+A_LEXICON_WITH_A_MISTAKE: dict[str, Any] = {
+    "schemaVersion": "1",
+    "defaultLocale": "de-DE",
+    "entities": {
+        "movie": {
+            "canonicalId": "product",
+            "locales": {
+                "de-DE": {
+                    "preferred": {"singular": "film", "plural": "filme"},
+                    "alternates": "spielfilm",
+                }
+            },
+        }
+    },
+}
+
+
+def a_rejected_lexicon_names_the_entry_locale_and_field() -> None:
+    """A rejected lexicon names the entry, locale, and field at fault [C3]
+
+    The other half of "validation is construction", and the first real question
+    a lexicon author has about the format: what a mistake in my own file will
+    look like.
+    """
+    emit(
+        "claim",
+        "A document lexiqr refuses is refused with coordinates. ValidationError "
+        "carries the entry, the locale, and the field at fault as attributes, so "
+        "a service can route the failure, and repeats them in one sentence a "
+        "lexicon author can act on without reading any Python.",
+    )
+    emit(
+        "document",
+        'entry "movie", locale de-DE, with `"alternates": "spielfilm"` — a bare '
+        "string where the format wants an array of labels.",
+    )
+
+    try:
+        Lexicon.from_dict(A_LEXICON_WITH_A_MISTAKE)
+    except ValidationError as invalid:
+        rejected = invalid
+    else:
+        raise AssertionError(
+            "the loader accepted a document that is not a valid lexicon; "
+            "validation is construction only if construction can refuse"
+        )
+
+    emit("raised", type(rejected).__name__)
+    emit("entry", rejected.canonical_id or "(none)")
+    emit("locale", rejected.locale or "(none)")
+    emit("field", rejected.field or "(none)")
+    emit("message", str(rejected))
+    emit(
+        "held",
+        "the loader refused the document rather than handing back a half-checked "
+        "one, and the refusal names all three coordinates — both as attributes to "
+        "branch on and in the message an author reads.",
+    )
+
+    assert rejected.canonical_id == "movie", (
+        f"the refusal names the entry at fault, not {rejected.canonical_id!r}"
+    )
+    assert rejected.locale == "de-DE", (
+        f"the refusal names the locale at fault, not {rejected.locale!r}"
+    )
+    assert rejected.field == "alternates", (
+        f"the refusal names the field at fault, not {rejected.field!r}"
+    )
+    for coordinate in ("movie", "de-DE", "alternates"):
+        assert coordinate in str(rejected), (
+            f"the message an author reads does not mention {coordinate!r}: {rejected}"
+        )
+
+
 # --- The driver --------------------------------------------------------------
 
 
@@ -166,7 +244,10 @@ class Section(Protocol):
 
 #: Every section, in the order the transcript prints them. Position is the
 #: section number, so adding one here is the whole edit.
-SECTIONS: tuple[Section, ...] = (a_lexicon_loads_from_a_file,)
+SECTIONS: tuple[Section, ...] = (
+    a_lexicon_loads_from_a_file,
+    a_rejected_lexicon_names_the_entry_locale_and_field,
+)
 
 
 def title_of(section: Section) -> str:
