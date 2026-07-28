@@ -14,12 +14,14 @@ The project's ubiquitous language. Code, docs, plans, and issues use these terms
 - **Tenant** — one customer of the integrating developer's SaaS. One `EntityResolver` instance = one tenant's lexicon; tenant→instance mapping is the host application's job.
 - **Lexicon** — a tenant's multilingual mapping from jargon to canonical entities; a JSON document (or Python dict) conforming to the versioned lexicon schema.
 - **Entity** — a canonical database concept the backend actually queries (e.g. `product`). In lexiqr an entity is just its **canonical ID** — never storage, never a row.
+- **Entry** — a named set of surface forms resolving to one entity, optionally carrying **metadata**. What a lexicon's `entities` object is keyed by; its key is the **entry ID**. "movie" and "series" are two entries resolving to `product`.
+- **Metadata** — an entry's opaque, tenant-defined key/value bag (`{"productType": "Movie"}`), carried verbatim to every match the entry produces and **never interpreted** by lexiqr. Values are strings, numbers, booleans, or lists of strings.
 - **Surface form** — a word or phrase a tenant's users actually type for an entity, per locale: preferred (singular/plural) or alternate labels. "flooff" is a preferred de-DE surface form of `product`.
-- **Canonical ID** — the stable identifier of an entity (`product`); what a match resolves *to*.
+- **Canonical ID** — the stable identifier of an entity (`product`); what a match resolves *to*. An entry declares it, defaulting to the entry ID when omitted, and several entries may share one.
 - **Prompt** — the free-form user text handed to `transform()`. lexiqr never guesses its language; the caller states the locale.
 - **Locale** — a BCP 47 tag (`de-DE`). A lexicon declares a default locale; resolution may walk a **fallback chain** (exact locale → same-language variants → declared default).
 - **Match report** — the typed result of `transform()`: original prompt, resolved locale, and an ordered list of entity matches.
-- **Entity match** — one resolution inside a match report: canonical ID, matched surface form, **character span** in the original text, **score tier**, applied **correction** (if fuzzy), and the locale that actually matched.
+- **Entity match** — one resolution inside a match report: canonical ID, the **entry** that answered, matched surface form, **character span** in the original text, **score tier**, the locale that actually matched, applied **correction** (if fuzzy), and the entry's **metadata** (an empty mapping when it declares none).
 - **Score tier** — the deterministic ranking of match quality: preferred > alternate > canonical.
 - **Span** — start/end character offsets into the *original* prompt text, valid even when normalization stripped accents.
 - **Correction** — the fuzzy-match record showing what misspelling was mapped to which surface form ("floof" → "flooff") within the **edit budget** (length-aware maximum edit distance).

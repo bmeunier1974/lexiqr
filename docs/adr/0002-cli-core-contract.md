@@ -2,7 +2,10 @@
 
 ## Status
 
-Accepted (2026-07-23)
+Accepted (2026-07-23). The `MatchReport` shape it names is extended by
+[ADR 0005](0005-entry-metadata-format.md): a match also carries the entry that
+answered and that entry's metadata. The contract itself — public API only,
+in-process, one validation code path — stands unchanged.
 
 ## Context
 

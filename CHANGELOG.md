@@ -45,8 +45,69 @@ ships; until then the top released entry below stays 1.0.0.
   message an author reads is core's own sentence, under the CLI's prefix — one
   wording, one code path (ADR 0002). CLI output and exit codes are unchanged.
 
-Additive only: no resolution behaviour changed, and nothing else became public
-— the fallback, index, locale, matcher and normalizer machinery stays internal.
+- **Several terms may resolve to one entity, each with a discriminating filter**
+  (ADR 0005). What a lexicon's `entities` object keys is now read as an **entry**:
+  a named set of surface forms plus the entity it resolves to. An entry may
+  declare `canonicalId`, which **defaults to the entry ID** when omitted — so
+  every lexicon written before this means exactly what it always meant — and
+  several entries may name the same one. "movie" and "series" can both be
+  `product` without inventing entities the backend does not have.
+- **An entry may carry `metadata`**: a tenant-defined bag, at most 16 keys, each
+  value a string, a number, a boolean, or a list of unique strings. No `null`, no
+  nesting. lexiqr **carries it and never interprets it** — every match reports its
+  entry's metadata verbatim, and metadata never influences which matches are
+  returned, their score tiers, or their order. `Metadata` and `MetadataValue` are
+  public and fully hinted, so a consuming service builds a search filter straight
+  from a match report with no per-tenant table of its own.
+- **`Entry` is public**, so a caller walking `Lexicon.entries` can name what it
+  finds and read each entry's ID, the entity it resolves to, and its filter.
+- **`lexiqr try` shows which entry answered and what filter it carried** — two
+  lines, printed only when they say something, so a lexicon using neither feature
+  renders exactly as before. Exit codes and `lexiqr validate` output are unchanged.
+- **Two new beyond-schema checks**, both in
+  [docs/lexicon-semantic-checks.md](docs/lexicon-semantic-checks.md): a
+  `canonicalId` may not point at an entry that itself resolves elsewhere (a target
+  is an entity, not another entry), and a metadata value may not be only
+  whitespace — it would become a live filter that silently narrows every query.
+
+### Changed
+
+- **The published JSON Schema is amended in place** and republished at the pending
+  tag: `$id`, `schema/published.json`, every `$schema` reference and the authoring
+  guide's URL all moved together. The previous tag keeps resolving to the bytes it
+  had. `RELEASING.md` now documents the republication procedure and names the test
+  that enforces it. There is deliberately **no second schema version** — justified
+  by the pre-publication window and nothing else (ADR 0005).
+
+### Breaking
+
+Nothing has been published to PyPI, so none of these can affect an installed
+consumer; all three were free before the first release tag and impossible after
+it, which is why they land now.
+
+- **`EntityMatch` gained two fields and reordered.** `entry_id` is always a real
+  string — equal to the canonical ID for an entry that resolves to itself, rather
+  than an optional meaning "same as the canonical ID" — which puts it positionally
+  ahead of `correction`. `metadata` is last, defaulting to the empty mapping. Code
+  constructing an `EntityMatch` positionally must be updated; code reading fields
+  by name is unaffected, and `canonical_id` still means the entity your backend
+  queries.
+- **`serialize_report` always emits `entry_id` and `metadata`.** Metadata is an
+  object, empty when the entry declares none — no conditional emission, so a
+  consumer's parser never branches on whether a key is present. Any snapshot taken
+  from an earlier build must be regenerated. Round-tripping restores the types, so
+  a stored report still compares equal to the one it was stored from, and the
+  module's shape promise now says it binds from the first release tag onward.
+- **Identifier validation tightened.** Core accepted any string as an entity key,
+  which was looser than the published schema. Both the entry key and the
+  `canonicalId` value are now checked against the schema's pattern (letters,
+  digits, `_`, `.`, `-`), so both sides of the ADR 0003 equivalence contract give
+  the same verdict. A lexicon that already passed the published schema is
+  unaffected.
+
+Otherwise additive: resolution behaviour is unchanged for a lexicon that does not
+use the new fields, and nothing else became public — the fallback, index, locale,
+matcher, normalizer and ordering machinery stays internal.
 
 ## [1.0.0] - 2026-07-24
 

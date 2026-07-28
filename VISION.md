@@ -33,10 +33,11 @@ Backend engineers building multi-tenant search and AI features face tenants with
 - **C16** — A maintainer sees every pull request automatically run lint (ruff), strict type-check (mypy), and the test suite across Python 3.10–3.13.
 - **C17** — A maintainer can cut a release by pushing a version tag: CI builds the distribution and publishes it to PyPI via trusted publishing (no long-lived tokens), with semver and a changelog entry per release.
 - **C18** — An OSS contributor can clone the public GitHub repo, set up the dev environment with one command (`uv sync`), and run the full test suite locally.
+- **C19** — A lexicon author can declare several **entries** resolving to one entity — "movie" and "series" both `product` — each carrying **metadata** that discriminates them (`productType = Movie`), and every match reports the entity, the entry that answered, and that entry's metadata verbatim, so an integrating developer builds a search filter straight from a match report with no per-tenant table of their own.
 
 ## Non-goals
 
-- **LLM filter building and search-definition validation** — turning detected entities into search filters stays in consuming services.
+- **LLM filter building and search-definition validation** — lexiqr **carries** the filter metadata a lexicon author attaches to an entry (C19) and never builds or validates a filter from it: turning `productType = Movie` into a backend query stays in consuming services. No metadata query language, and metadata never influences which matches are returned, their tiers, or their order.
 - **HTTP server / FastAPI wrapper** — lexiqr is a library; services wrap it themselves.
 - **Language detection** — the caller states the prompt's locale.
 - **Built-in multi-tenant registry** — one instance = one tenant's lexicon; tenant→instance mapping is the host application's job (documented as a recipe, not code).
