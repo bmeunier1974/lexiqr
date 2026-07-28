@@ -42,7 +42,15 @@ import textwrap
 from pathlib import Path
 from typing import Any, Protocol, cast
 
-from lexiqr import Lexicon, ValidationError
+from lexiqr import (
+    EntityMatch,
+    EntityResolver,
+    Lexicon,
+    Metadata,
+    MetadataValue,
+    ScoreTier,
+    ValidationError,
+)
 
 #: The tenant lexicon every section resolves against, found relative to this
 #: file so the working directory is irrelevant.
@@ -86,6 +94,66 @@ def emit(label: str, text: str) -> None:
             break_on_hyphens=False,
         )
     )
+
+
+def render_match(match: EntityMatch) -> str:
+    """One entity match as one dense line: what resolved, and how well.
+
+    The seam every section's result is read off, so it is a named function rather
+    than a private detail — a unit test over it is a test of the format a reader
+    sees, not of an internal.
+
+    Deliberately *not* the CLI's report renderer. That one is private to the CLI
+    and spends three to five lines per match; across twelve sections it would
+    make this transcript unreadable. Section 12 shows the CLI's own format
+    honestly, by running the real CLI.
+
+    Total over the match type, the same way the CLI's renderer is: the fields a
+    match only sometimes carries — the entry that answered, the filter it
+    carried, the correction that was applied — are printed only when they say
+    something, so a plain lexicon reads exactly as it did before those features
+    existed.
+    """
+    line = (
+        f'{match.canonical_id} ← "{match.surface_form}"'
+        f"  span={match.span}"
+        f"  tier={match.score_tier.value}"
+        f"  locale={match.matched_locale}"
+    )
+    if match.entry_id != match.canonical_id:
+        line += f"  entry={match.entry_id}"
+    if match.metadata:
+        line += f"  filter={{{render_filter(match.metadata)}}}"
+    if match.correction is not None:
+        line += f'  correction="{match.correction}"'
+    return line
+
+
+def render_filter(metadata: Metadata) -> str:
+    """An entry's filter as `key=value` pairs, in the spelling its author used.
+
+    `Metadata` already iterates in sorted key order, so this reads that order
+    rather than imposing one of its own — which is what makes two runs of this
+    command produce the same text.
+    """
+    return ", ".join(f"{key}={render_filter_value(metadata[key])}" for key in metadata)
+
+
+def render_filter_value(value: MetadataValue) -> str:
+    """One filter value, spelled the way the lexicon file spells it.
+
+    A boolean is the one place Python and JSON disagree — `True` against `true` —
+    and a reader is reading this line to learn what their own *file* does, so
+    echoing a spelling that is not in the file would be a small lie in exactly
+    the tool that must not tell one. Asked before numbers, since `bool`
+    subclasses `int`. A set of values joins on a pipe, the separator the CLI uses
+    and one a filter value cannot contain.
+    """
+    if isinstance(value, tuple):
+        return "|".join(value)
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    return str(value)
 
 
 def heading(number: int, title: str) -> None:
@@ -225,6 +293,102 @@ def a_rejected_lexicon_names_the_entry_locale_and_field() -> None:
         )
 
 
+def an_exact_match_reports_entity_form_span_and_tier() -> None:
+    """An exact match reports the entity, the form, the span, and the tier [C4]
+
+    The first match a reader sees, and the moment an integrating developer
+    decides whether the report's shape fits their service. The span is used to
+    slice the *original* prompt, so it is visible that offsets index the text the
+    user typed rather than a normalized copy of it.
+    """
+    prompt = "wo ist die rechnung"
+    report = EntityResolver.from_file(LEXICON).transform(prompt, "de-DE")
+    match = report.matches[0]
+    start, end = match.span
+
+    emit(
+        "claim",
+        "transform() returns a typed match report: the prompt it was given, the "
+        "locale that resolved it, and an ordered list of matches — each naming "
+        "the entity, the surface form it matched, its character span, and its "
+        "score tier.",
+    )
+    emit("prompt", f'"{report.prompt}"')
+    emit("locale", report.locale)
+    emit("matches", str(len(report.matches)))
+    emit("match", render_match(match))
+    emit("sliced", f'prompt[{start}:{end}] == "{prompt[start:end]}"')
+    emit(
+        "held",
+        "the span indexes the prompt as typed, so slicing the original text by it "
+        "gives back exactly the surface form the match reports — no second search, "
+        "no normalized copy to reconcile.",
+    )
+
+    assert len(report.matches) == 1, f"expected one match, got {report.matches}"
+    assert report.prompt == prompt, "the report carries the prompt it was handed"
+    assert report.locale == "de-DE", f"the report resolved via {report.locale!r}"
+    assert match.canonical_id == "invoice", (
+        f"'rechnung' resolves to the invoice entity, not {match.canonical_id!r}"
+    )
+    assert match.score_tier is ScoreTier.PREFERRED, (
+        f"a tenant's preferred singular scores preferred, not {match.score_tier}"
+    )
+    assert prompt[start:end] == match.surface_form, (
+        f"the span slices the original prompt to {prompt[start:end]!r}, but the "
+        f"match reports {match.surface_form!r}"
+    )
+
+
+#: One prompt per score tier, in the order the ranking puts them: the tenant's
+#: preferred plural, an alternate label they also accept, and the entry ID their
+#: users never see but a prompt may still name outright.
+ONE_PROMPT_PER_TIER = (
+    (ScoreTier.PREFERRED, "wo sind die filme"),
+    (ScoreTier.ALTERNATE, "wo ist der spielfilm"),
+    (ScoreTier.CANONICAL, "wo sind die series"),
+)
+
+
+def every_score_tier_resolves_and_names_itself() -> None:
+    """Preferred, alternate and canonical each resolve and each name their tier [C4]
+
+    Score tier is the whole of lexiqr's ranking: a deterministic ordering, not a
+    similarity number a caller has to threshold.
+    """
+    resolver = EntityResolver.from_file(LEXICON)
+
+    emit(
+        "claim",
+        "A match names the tier it scored in, and the ranking is fixed: preferred "
+        "beats alternate beats canonical. A tenant's own vocabulary outranks a "
+        "synonym they also accept, and both outrank the entry identifier their "
+        "users never see.",
+    )
+
+    observed: list[ScoreTier] = []
+    for expected, prompt in ONE_PROMPT_PER_TIER:
+        match = resolver.transform(prompt, "de-DE").matches[0]
+        observed.append(match.score_tier)
+        emit(expected.value, f'"{prompt}" → {render_match(match)}')
+
+    emit(
+        "held",
+        "all three tiers were observed, each one named by the match that came "
+        "back rather than inferred from which prompt was sent.",
+    )
+
+    assert set(observed) == set(ScoreTier), (
+        f"the three prompts scored {[tier.value for tier in observed]}; a section "
+        f"that resolved one tier three times would demonstrate nothing"
+    )
+    for (expected, prompt), scored in zip(ONE_PROMPT_PER_TIER, observed, strict=True):
+        assert scored is expected, (
+            f"{prompt!r} was meant to show the {expected.value} tier and scored "
+            f"{scored.value}"
+        )
+
+
 # --- The driver --------------------------------------------------------------
 
 
@@ -247,6 +411,8 @@ class Section(Protocol):
 SECTIONS: tuple[Section, ...] = (
     a_lexicon_loads_from_a_file,
     a_rejected_lexicon_names_the_entry_locale_and_field,
+    an_exact_match_reports_entity_form_span_and_tier,
+    every_score_tier_resolves_and_names_itself,
 )
 
 

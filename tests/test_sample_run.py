@@ -30,13 +30,22 @@ import ast
 import json
 import subprocess
 import sys
+from dataclasses import replace
 from pathlib import Path
+from typing import Any
 
 import demo
 import pytest
 
 from conftest import REPO_ROOT
-from lexiqr import Lexicon, ValidationError
+from lexiqr import (
+    EntityMatch,
+    EntityResolver,
+    Lexicon,
+    Metadata,
+    ScoreTier,
+    ValidationError,
+)
 
 EXAMPLES = REPO_ROOT / "examples"
 RUN = EXAMPLES / "demo.py"
@@ -299,6 +308,54 @@ def test_the_transcript_names_the_coordinates_the_loader_really_reports() -> Non
     )
 
 
+def test_the_transcript_shows_the_exact_match_the_resolver_produces() -> None:
+    """Section 3's line, pinned to the resolver rather than to the golden.
+
+    The same prompt is resolved here, so if the span moved or the tier changed,
+    a golden regenerated from that state would agree with itself and this would
+    not. The slice assertion is the section's actual claim, and is made without
+    going through the run's renderer at all.
+    """
+    match = (
+        EntityResolver.from_file(LEXICON)
+        .transform("wo ist die rechnung", "de-DE")
+        .matches[0]
+    )
+    printed = transcript_of("an_exact_match_reports_entity_form_span_and_tier")
+    start, end = match.span
+
+    assert collapsed(demo.render_match(match)) in printed, (
+        f"the section does not show the match the resolver returns: {match}"
+    )
+    assert f'prompt[{start}:{end}] == "{match.surface_form}"' in printed, (
+        "the section does not show the original prompt sliced by the span"
+    )
+
+
+def test_the_transcript_shows_a_match_in_every_score_tier() -> None:
+    """Section 4's three lines, and that they really are three different tiers.
+
+    The prompts come from the run itself, so this cannot drift out of step with
+    what the section sends; the tiers come from the resolver, so a change in the
+    scoring policy fails here rather than being absorbed by a regenerated golden.
+    """
+    resolver = EntityResolver.from_file(LEXICON)
+    printed = transcript_of("every_score_tier_resolves_and_names_itself")
+
+    scored = set()
+    for _, prompt in demo.ONE_PROMPT_PER_TIER:
+        match = resolver.transform(prompt, "de-DE").matches[0]
+        scored.add(match.score_tier)
+        assert collapsed(demo.render_match(match)) in printed, (
+            f"the section does not show what {prompt!r} resolves to: {match}"
+        )
+
+    assert scored == set(ScoreTier), (
+        f"the section's prompts cover {sorted(tier.value for tier in scored)}, not "
+        f"every score tier"
+    )
+
+
 def test_the_run_records_how_its_golden_is_regenerated() -> None:
     """A golden nobody knows how to rebuild is a golden that gets hand-edited.
 
@@ -312,3 +369,107 @@ def test_the_run_records_how_its_golden_is_regenerated() -> None:
         f"{RUN.name} does not record the command that rebuilds {GOLDEN.name}: "
         f"{REGENERATE}"
     )
+
+
+# --- The render helper. Hand-built reports in, expected lines out: no
+# --- subprocess, no lexicon, no resolver. This is why the helper is a named
+# --- function in the run rather than a private detail, and why the module is
+# --- import-safe. A format regression fails here, at the format, rather than in
+# --- whichever section happened to show it first.
+
+
+#: The plainest match there is: an exact, preferred, de-DE hit by an entry that is
+#: its own entity, carrying no filter and no correction.
+AN_EXACT_MATCH = EntityMatch(
+    canonical_id="product",
+    entry_id="product",
+    surface_form="flooff",
+    span=(7, 13),
+    score_tier=ScoreTier.PREFERRED,
+    matched_locale="de-DE",
+)
+
+
+def a_match(**overrides: Any) -> EntityMatch:
+    """The plain match with some of its fields replaced by name."""
+    return replace(AN_EXACT_MATCH, **overrides)
+
+
+def test_the_render_helper_names_what_resolved_and_how_well() -> None:
+    """The line every section's result is read off: entity, form, span, tier, locale.
+
+    Deliberately not the CLI's renderer, which is private to the CLI and spends
+    three to five lines per match — across twelve sections that transcript would
+    be unreadable. Section 12 shows the CLI's format honestly by running the
+    real CLI.
+    """
+    rendered = demo.render_match(a_match())
+
+    assert rendered == (
+        'product ← "flooff"  span=(7, 13)  tier=preferred  locale=de-DE'
+    )
+
+
+def test_the_render_helper_names_the_entry_only_when_it_is_not_the_entity() -> None:
+    """The distinction an integrating developer has to key on, made visible.
+
+    An entry that *is* its entity has one name, so repeating it would make every
+    match in every lexicon read as though something more complicated were going
+    on. An entry that resolves to a shared entity has two, and which of them a
+    service keys on is the whole question section 5 is about.
+    """
+    plain = demo.render_match(a_match())
+    shared = demo.render_match(
+        a_match(canonical_id="product", entry_id="movie", surface_form="filme")
+    )
+
+    assert "entry=" not in plain, f"a plain entry named itself twice: {plain}"
+    assert shared == (
+        'product ← "filme"  span=(7, 13)  tier=preferred  locale=de-DE  entry=movie'
+    )
+
+
+def test_the_render_helper_shows_a_filter_in_the_spelling_its_author_used() -> None:
+    """`true`, not `True` — the reader is reading this to learn about their file.
+
+    A boolean is the one value where Python and JSON disagree, and echoing
+    Python's spelling would be a small lie in exactly the place that must not
+    tell one. A multi-valued key joins on a pipe, the separator the CLI uses and
+    the one a filter value cannot contain.
+    """
+    rendered = demo.render_match(
+        a_match(
+            entry_id="series",
+            surface_form="serien",
+            metadata=Metadata(
+                {"episodic": True, "seasons": 4, "genre": ("drama", "thriller")}
+            ),
+        )
+    )
+
+    assert rendered.endswith(
+        "  entry=series  filter={episodic=true, genre=drama|thriller, seasons=4}"
+    ), rendered
+
+
+def test_the_render_helper_omits_a_filter_an_entry_never_declared() -> None:
+    """An empty mapping is absent, not `filter={}`.
+
+    lexiqr hands a match an empty metadata bag rather than `None` so consuming
+    code needs no guard — but a line that says nothing is a line a reader has to
+    read past, so the transcript prints one only when there is a filter.
+    """
+    assert "filter=" not in demo.render_match(a_match())
+
+
+def test_the_render_helper_shows_a_correction_only_when_one_was_applied() -> None:
+    """A fuzzy match names what the user typed; an exact one has nothing to name.
+
+    The correction is the text the span points at, so a reader can see both the
+    misspelling and the declared form it resolved to on one line — which is what
+    section 6 turns on.
+    """
+    corrected = demo.render_match(a_match(span=(0, 5), correction="floof"))
+
+    assert corrected.endswith('correction="floof"'), corrected
+    assert "correction=" not in demo.render_match(a_match())

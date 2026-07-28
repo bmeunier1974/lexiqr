@@ -33,4 +33,32 @@ held      the loader refused the document rather than handing back a half-checke
           and the refusal names all three coordinates — both as attributes to branch on
           and in the message an author reads.
 
+--- 3. An exact match reports the entity, the form, the span, and the tier [C4] ---
+
+claim     transform() returns a typed match report: the prompt it was given, the locale
+          that resolved it, and an ordered list of matches — each naming the entity, the
+          surface form it matched, its character span, and its score tier.
+prompt    "wo ist die rechnung"
+locale    de-DE
+matches   1
+match     invoice ← "rechnung"  span=(11, 19)  tier=preferred  locale=de-DE
+sliced    prompt[11:19] == "rechnung"
+held      the span indexes the prompt as typed, so slicing the original text by it gives
+          back exactly the surface form the match reports — no second search, no
+          normalized copy to reconcile.
+
+--- 4. Preferred, alternate and canonical each resolve and each name their tier [C4] ---
+
+claim     A match names the tier it scored in, and the ranking is fixed: preferred beats
+          alternate beats canonical. A tenant's own vocabulary outranks a synonym they
+          also accept, and both outrank the entry identifier their users never see.
+preferred "wo sind die filme" → product ← "filme"  span=(12, 17)  tier=preferred
+          locale=de-DE  entry=movie  filter={genre=drama|thriller, productType=Movie}
+alternate "wo ist der spielfilm" → product ← "spielfilm"  span=(11, 20)  tier=alternate
+          locale=de-DE  entry=movie  filter={genre=drama|thriller, productType=Movie}
+canonical "wo sind die series" → product ← "series"  span=(12, 18)  tier=canonical
+          locale=de-DE  entry=series  filter={episodic=true, productType=Series}
+held      all three tiers were observed, each one named by the match that came back
+          rather than inferred from which prompt was sent.
+
 OK: every section held.
