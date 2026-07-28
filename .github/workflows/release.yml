@@ -118,6 +118,21 @@ jobs:
       - name: Reproduce the flooff match from the installed package
         run: /tmp/clean-venv/bin/python scripts/reproduce_flooff.py
 
+      - name: Run the full sample run against the installed package
+        # Twelve claims rather than one. The sample run imports nothing but
+        # lexiqr and the standard library and finds its lexicon relative to its
+        # own file, so pointing the clean virtualenv's interpreter at it exercises
+        # the *published* package across the whole contract.
+        #
+        # Its exit code is the whole assertion here. The golden comparison is a
+        # test concern, and this commit's CI has already pinned the shipped
+        # wording on all four supported Pythons — re-comparing it in the release
+        # job would only add a way for a release to fail for a reason already
+        # covered. The flooff canary above stays for the opposite reason: when the
+        # sample run is what broke, one claim is the signal that still means
+        # something unambiguous.
+        run: /tmp/clean-venv/bin/python examples/demo.py
+
       - name: Confirm the lexiqr console entry point is callable
         run: |
           set -euo pipefail
