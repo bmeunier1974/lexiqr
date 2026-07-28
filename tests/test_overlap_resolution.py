@@ -131,10 +131,11 @@ def test_an_exact_hit_outranks_an_overlapping_fuzzy_hit_even_a_longer_one() -> N
     from lexiqr.matcher import _Claim, _resolve
 
     exact = _Claim(
-        Hit("product", "widget", (4, 10), ScoreTier.CANONICAL), is_fuzzy=False
+        Hit("product", "product", "widget", (4, 10), ScoreTier.CANONICAL),
+        is_fuzzy=False,
     )
     longer_fuzzy = _Claim(
-        Hit("gadget", "gadgetry", (0, 12), ScoreTier.PREFERRED), is_fuzzy=True
+        Hit("gadget", "gadget", "gadgetry", (0, 12), ScoreTier.PREFERRED), is_fuzzy=True
     )
 
     assert _resolve((longer_fuzzy, exact)) == (exact,)

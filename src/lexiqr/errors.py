@@ -20,6 +20,27 @@ two exit codes are made of.
 
 from __future__ import annotations
 
+from typing import Any
+
+#: The JSON name of each type a parsed document can hold. Naming what a value
+#: turned out to be is half of every type fault lexiqr reports, and it is reported
+#: from more than one module — so the wording lives here, with the errors, and "an
+#: object" never becomes "a dict" in one message and not another.
+_JSON_KINDS = {
+    dict: "an object",
+    list: "an array",
+    str: "a string",
+    bool: "a boolean",
+    int: "a number",
+    float: "a number",
+    type(None): "null",
+}
+
+
+def kind(value: Any) -> str:
+    """The JSON name for what `value` turned out to be, for an error message."""
+    return _JSON_KINDS.get(type(value), f"a {type(value).__name__}")
+
 
 class ValidationError(Exception):
     """A lexicon was rejected. Says what is wrong, and where.

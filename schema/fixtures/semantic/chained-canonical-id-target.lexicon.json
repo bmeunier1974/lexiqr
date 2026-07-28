@@ -1,0 +1,23 @@
+{
+  "$schema": "https://raw.githubusercontent.com/bmeunier1974/lexiqr/v1.1.0/schema/lexicon.v1.schema.json",
+  "schemaVersion": "1",
+  "defaultLocale": "de-DE",
+  "entities": {
+    "movie": {
+      "canonicalId": "product",
+      "locales": {
+        "de-DE": {
+          "preferred": { "singular": "film" }
+        }
+      }
+    },
+    "feature_film": {
+      "canonicalId": "movie",
+      "locales": {
+        "de-DE": {
+          "preferred": { "singular": "spielfilm" }
+        }
+      }
+    }
+  }
+}

@@ -107,7 +107,7 @@ try:
 except ValidationError as invalid:
     print(f"rejected: {invalid}")
 else:
-    print(f"valid: {sorted(lexicon.entities)} in {lexicon.default_locale}")
+    print(f"valid: {sorted(lexicon.entries)} in {lexicon.default_locale}")
 ```
 
 <!-- quickstart:expected -->
@@ -167,14 +167,17 @@ that surface is named explicitly. Semver governs:
   `EntityResolver` and its `from_file` / `from_dict` / `transform` methods,
   including the `fuzzy` keyword.
 - **The lexicon model** — `Lexicon`, the type `EntityResolver` takes, with its
-  validating `from_file` / `from_dict` constructors, and `SurfaceForms`, the
-  shape it holds per entity and locale.
+  validating `from_file` / `from_dict` constructors; `Entry`, the named set of
+  surface forms an entity is keyed by, with the entity it resolves to and the
+  filter it carries; `SurfaceForms`, the shape an entry holds per locale; and
+  `Metadata` / `MetadataValue`, that filter and the values it may hold.
 - **The structured error types** — `ValidationError` and its coordinates
   (`canonical_id`, `locale`, `field`), which the CLI renders verbatim, and
   `MalformedDocumentError`, the `ValidationError` subclass raised when a file is
   not JSON at all.
 - **The match report types** — `MatchReport`, `EntityMatch`, and `ScoreTier`,
-  and the fields a caller reads off them (span, tier, correction).
+  and the fields a caller reads off them (span, tier, correction, the entry that
+  answered, and its metadata).
 - **The canonical report serialization** — the byte-level shape produced by
   `serialize_report` and consumed by `deserialize_report`.
 - **The two documented limits** — `MAX_PROMPT_LENGTH` and

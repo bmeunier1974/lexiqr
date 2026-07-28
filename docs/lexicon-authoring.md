@@ -13,7 +13,7 @@ The lexicon format is described by a published
 [JSON Schema](https://json-schema.org/), at this URL:
 
 ```
-https://raw.githubusercontent.com/bmeunier1974/lexiqr/v0.0.1/schema/lexicon.v1.schema.json
+https://raw.githubusercontent.com/bmeunier1974/lexiqr/v1.1.0/schema/lexicon.v1.schema.json
 ```
 
 The version is in the path on purpose. That URL names a **tag**, and a tag
@@ -35,7 +35,7 @@ give you completion, hover documentation, and red squiggles as you type:
 
 ```json
 {
-  "$schema": "https://raw.githubusercontent.com/bmeunier1974/lexiqr/v0.0.1/schema/lexicon.v1.schema.json",
+  "$schema": "https://raw.githubusercontent.com/bmeunier1974/lexiqr/v1.1.0/schema/lexicon.v1.schema.json",
   "schemaVersion": "1",
   "defaultLocale": "de-DE",
   "entities": {
@@ -54,6 +54,114 @@ give you completion, hover documentation, and red squiggles as you type:
 `examples/flooff.lexicon.json` in this repository is a complete working example
 with the reference already in place.
 
+## Several words, one entity, and the filter that tells them apart
+
+Your users rarely have one word per thing in your database. A German media
+tenant's users type "film", "filme", "spielfilm", "serie" and "serien" — and to
+the backend every one of those is the same `product`. What separates them is not
+*which* entity to query but *how to narrow it*: a movie is a `product` with
+`productType = Movie`, a series is a `product` with `productType = Series`.
+
+You say that with two **entries** resolving to one entity, each carrying the
+filter that discriminates it:
+
+```json
+{
+  "schemaVersion": "1",
+  "defaultLocale": "de-DE",
+  "entities": {
+    "movie": {
+      "canonicalId": "product",
+      "metadata": { "productType": "Movie", "genre": ["drama", "thriller"] },
+      "locales": {
+        "de-DE": {
+          "preferred": { "singular": "film", "plural": "filme" },
+          "alternates": ["spielfilm"]
+        },
+        "en-GB": { "preferred": { "singular": "movie", "plural": "movies" } }
+      }
+    },
+    "series": {
+      "canonicalId": "product",
+      "metadata": { "productType": "Series", "episodic": true },
+      "locales": {
+        "de-DE": { "preferred": { "singular": "serie", "plural": "serien" } },
+        "en-GB": { "preferred": { "singular": "series" } }
+      }
+    }
+  }
+}
+```
+
+The complete file is
+`schema/fixtures/valid/medien-shared-entity.lexicon.json` in this repository.
+
+Three things to know about it:
+
+**The key is the entry, `canonicalId` is the entity.** `movie` and `series` are
+*entry* names — yours, for your own use. `product` is what your backend queries,
+and it is what every match reports. Nothing forces you to invent entities your
+database does not have.
+
+**Omit `canonicalId` and the entry *is* the entity.** Every lexicon on this page
+above this section omits it, and means exactly what it always meant: one word per
+entity, entry name and canonical ID the same string. You only reach for the field
+when you have a second word for the same thing.
+
+Two rules go with it. Two entries may resolve to the same entity, but a
+`canonicalId` may not point at an entry that itself resolves somewhere else — a
+target has to be an entity, not another entry. And two entries still may not
+claim the same word in the same locale: which filter would apply is unanswerable,
+so the file is refused with a message naming both entries.
+
+**`metadata` is yours; lexiqr never interprets it.** It carries your bag from the
+file to the match report, verbatim, and does nothing else with it — no filter
+building, no validation of what the keys mean, and no effect on which matches come
+back or in what order. Turning `productType = Movie` into a query is your
+service's job.
+
+A filter holds up to 16 keys. Each key is letters, digits, `_`, `.` or `-`, up to
+64 characters. Each value is one of:
+
+| Value | Example | Notes |
+| --- | --- | --- |
+| a string | `"Movie"` | 1–128 characters, and not just whitespace |
+| a number | `12`, `7.5` | |
+| a boolean | `true` | |
+| a list of strings | `["drama", "thriller"]` | 1–16 entries, no repeats — for a genuinely multi-valued filter like `genre` |
+
+There is deliberately no `null` (leave the key out instead) and no nesting — a
+value is a scalar or a set of scalars, because a filter language is not something
+lexiqr has.
+
+Entries resolving to the same entity do **not** have to carry the same keys. A
+more specific entry reasonably carries a more specific filter.
+
+### Confirming it works
+
+`lexiqr try` shows you the entity, the entry that answered, and the filter it
+carried:
+
+```bash
+lexiqr try medien.lexicon.json --locale de-DE "wo sind die filme"
+```
+
+```text
+prompt: "wo sind die [filme]"
+resolved via: de-DE
+1 match:
+
+  [1] product ← "filme"
+      tier: preferred   locale: de-DE   text: "filme"
+      entry: movie
+      filter: genre=drama|thriller, productType=Movie
+```
+
+The `entry:` line appears only when the entry resolves to a different entity, and
+the `filter:` line only when the entry carries metadata — so a lexicon that uses
+neither reads exactly as it did before these existed. A misspelling resolves the
+same way and carries the same filter, with a `correction:` line added.
+
 ## Checking a file before you ship it
 
 Any standard JSON Schema validator will do — nothing lexiqr-specific is
@@ -62,7 +170,7 @@ involved. Two convenient ones:
 ```bash
 # check-jsonschema (pipx install check-jsonschema)
 check-jsonschema --schemafile \
-  https://raw.githubusercontent.com/bmeunier1974/lexiqr/v0.0.1/schema/lexicon.v1.schema.json \
+  https://raw.githubusercontent.com/bmeunier1974/lexiqr/v1.1.0/schema/lexicon.v1.schema.json \
   my-tenant.lexicon.json
 
 # ajv-cli (npm install -g ajv-cli ajv-formats)
@@ -96,9 +204,10 @@ lexiqr try my-tenant.lexicon.json --locale de-DE "wo ist flooff"
 `lexiqr try <lexicon> --locale <locale> "<prompt>"` resolves a **prompt**,
 written in a **locale** (a BCP 47 tag), against the lexicon and prints the whole
 match report: every match with its canonical ID, the surface form that matched,
-the span marked in your prompt, the score tier, any correction a fuzzy match
-applied, and the locale that actually answered. Run either command with
-`--help` to see its arguments.
+the span marked in your prompt, the score tier, the locale that actually
+answered, any correction a fuzzy match applied, and — when the entry that
+answered resolves to a different entity, or carries metadata — the entry and its
+filter. Run either command with `--help` to see its arguments.
 
 ### Exit codes
 

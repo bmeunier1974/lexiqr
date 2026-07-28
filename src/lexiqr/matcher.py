@@ -37,6 +37,7 @@ from rapidfuzz.distance import DamerauLevenshtein, JaroWinkler
 
 from lexiqr.index import WORD_CHARACTER, Hit, SurfaceForm, SurfaceFormIndex
 from lexiqr.normalizer import Normalized, normalize
+from lexiqr.ordering import identity
 from lexiqr.types import EntityMatch, ScoreTier
 
 #: Best tier first. The enum orders by declaration, but that is a fact about the
@@ -48,6 +49,11 @@ _TIER_RANK = {
     ScoreTier.ALTERNATE: 1,
     ScoreTier.CANONICAL: 2,
 }
+
+#: A ranking key: mixed components, uniformly comparable, read left to right.
+#: Both rankings splice `ordering.identity` into theirs, and how wide that is
+#: belongs to that module, so neither key can be spelled as a fixed-length tuple.
+_Key = tuple[float | str, ...]
 
 #: A residue token is a run of the index's word characters: the same rule the
 #: exact scan applies when it requires a form to stand alone, stated there and
@@ -140,7 +146,7 @@ def _fuzzy_pass(
             continue
         best = _best_candidate(token, single_forms)
         if best is not None:
-            hits.append(_hit(best, span))
+            hits.append(Hit.of(best, span))
     for (left, left_span), (right, right_span) in zip(tokens, tokens[1:], strict=False):
         if _overlaps_any(left_span, covered) or _overlaps_any(right_span, covered):
             continue
@@ -149,7 +155,7 @@ def _fuzzy_pass(
             f"{right} {left}", multi_forms
         )
         if best is not None:
-            hits.append(_hit(best, span))
+            hits.append(Hit.of(best, span))
     return tuple(hits)
 
 
@@ -160,16 +166,6 @@ def _edit_budget(folded_length: int) -> int:
     if folded_length >= _MEDIUM_FORM:
         return 1
     return 0
-
-
-def _hit(form: SurfaceForm, span: tuple[int, int]) -> Hit:
-    """A near-miss, reported in the shape and coordinates an exact hit uses."""
-    return Hit(
-        canonical_id=form.canonical_id,
-        surface_form=form.surface_form,
-        span=span,
-        score_tier=form.score_tier,
-    )
 
 
 def _fuzzy_candidates(forms: tuple[SurfaceForm, ...]) -> tuple[SurfaceForm, ...]:
@@ -199,16 +195,14 @@ def _overlaps_any(span: tuple[int, int], covered: tuple[tuple[int, int], ...]) -
 def _best_candidate(token: str, forms: tuple[SurfaceForm, ...]) -> SurfaceForm | None:
     """The declared form `token` is most plausibly a misspelling of, or None.
 
-    The ranking is totally ordered, so the same typo resolves to the same form on
-    every run, machine, and Python version — determinism (C9) holds for fuzzy
-    results as it does for exact ones. In order: higher similarity, then lower
-    edit distance, then better tier, and finally the lower canonical ID and the
-    form's own spelling, so no tie ever falls through to iteration order. The
+    The ranking is `_correction_precedence`, and it is totally ordered, so the
+    same typo resolves to the same form on every run, machine, and Python version
+    — determinism (C9) holds for fuzzy results as it does for exact ones. The
     documented earliest-start rule orders the emitted matches and belongs to the
     overlap resolver below, where positions actually differ.
     """
     best: SurfaceForm | None = None
-    best_key: tuple[float, int, int, str, str] | None = None
+    best_key: _Key | None = None
     for form in forms:
         budget = _edit_budget(len(form.folded))
         if budget == 0:
@@ -219,16 +213,36 @@ def _best_candidate(token: str, forms: tuple[SurfaceForm, ...]) -> SurfaceForm |
         similarity = JaroWinkler.similarity(token, form.folded)
         if similarity < _MIN_SIMILARITY:
             continue
-        key = (
-            -similarity,
-            distance,
-            _TIER_RANK[form.score_tier],
-            form.canonical_id,
-            form.folded,
+        key = _correction_precedence(
+            similarity=similarity, distance=distance, form=form
         )
         if best_key is None or key < best_key:
             best, best_key = form, key
     return best
+
+
+def _correction_precedence(
+    *, similarity: float, distance: int, form: SurfaceForm
+) -> _Key:
+    """Sort key putting the form a typo most plausibly names first.
+
+    1. **Higher similarity wins**, then **lower edit distance**, then the
+       **better tier**: how close the guess is, before whose vocabulary it is.
+    2. **Then `ordering.identity` decides** — the shared component that makes this
+       ordering total, so two candidates alike in every reason above still resolve
+       the same way on every machine.
+    3. **Then the form's own spelling**, which separates two forms of one entity
+       that are equally plausible readings of the same typo. It sits after
+       identity rather than before it because identity is the coarser fact, and
+       swapping them would change which form an ambiguous typo resolves to.
+    """
+    return (
+        -similarity,
+        distance,
+        _TIER_RANK[form.score_tier],
+        *identity(form),
+        form.folded,
+    )
 
 
 def _resolve(claims: tuple[_Claim, ...]) -> tuple[_Claim, ...]:
@@ -248,7 +262,7 @@ def _resolve(claims: tuple[_Claim, ...]) -> tuple[_Claim, ...]:
     return tuple(sorted(kept, key=lambda claim: claim.hit.span))
 
 
-def _precedence(claim: _Claim) -> tuple[bool, int, int, int, str]:
+def _precedence(claim: _Claim) -> _Key:
     """Sort key putting the hit that should win an overlap first.
 
     0. **An exact hit beats an overlapping fuzzy one**, whatever their spans. A
@@ -261,15 +275,16 @@ def _precedence(claim: _Claim) -> tuple[bool, int, int, int, str]:
     2. **Then the better tier wins.** Their own vocabulary beats a synonym, and a
        synonym beats the identifier they never see.
     3. **Then the earlier start wins.**
-    4. **Then the lower canonical ID wins.** Two *different* entities can declare
+    4. **Then `ordering.identity` decides.** Two *different* entities can declare
        surface forms that fold to the same text — "cafe" and "café" both fold to
        "cafe" — and claim the same span at the same tier, which leaves nothing
-       about the text to choose between them. Something still has to be picked,
-       and picked the same way on every machine.
+       about the text to choose between them. Which of them is picked, and why
+       that answer is arbitrary, is the seam's to state; that something is always
+       picked is what makes this ordering total.
 
-    Rule 4 is arbitrary in the way a tiebreak has to be. Rules 0–3 are not. (Two
-    forms of the *same* entity that fold alike never reach here: the index keeps
-    the first-declared one, so only one hit is ever emitted for them.)
+    Rules 0–3 encode what a lexicon author meant, so they live here. (Two forms of
+    the *same* entity that fold alike never reach here: the index keeps the
+    first-declared one, so only one hit is ever emitted for them.)
     """
     start, end = claim.hit.span
     return (
@@ -277,7 +292,7 @@ def _precedence(claim: _Claim) -> tuple[bool, int, int, int, str]:
         start - end,
         _TIER_RANK[claim.hit.score_tier],
         start,
-        claim.hit.canonical_id,
+        *identity(claim.hit),
     )
 
 
@@ -302,9 +317,11 @@ def _to_match(
     start, end = normalized.to_original_span(*claim.hit.span)
     return EntityMatch(
         canonical_id=claim.hit.canonical_id,
+        entry_id=claim.hit.entry_id,
         surface_form=claim.hit.surface_form,
         span=(start, end),
         score_tier=claim.hit.score_tier,
         matched_locale=locale,
         correction=prompt[start:end] if claim.is_fuzzy else None,
+        metadata=claim.hit.metadata,
     )

@@ -38,7 +38,17 @@ prompt through it, read the report, and handle a bad lexicon.
 
 from pathlib import Path
 
-from lexiqr import EntityMatch, EntityResolver, MatchReport, ScoreTier, ValidationError
+from lexiqr import (
+    EntityMatch,
+    EntityResolver,
+    Entry,
+    Lexicon,
+    MatchReport,
+    Metadata,
+    MetadataValue,
+    ScoreTier,
+    ValidationError,
+)
 
 
 def resolver_for_tenant(lexicon_path: Path) -> EntityResolver:
@@ -67,10 +77,44 @@ def describe(match: EntityMatch) -> str:
     start, end = match.span
     tier: ScoreTier | None = match.score_tier
     correction: str | None = match.correction
+    entry_id: str = match.entry_id
     return (
         f"{match.surface_form}[{start}:{end}] -> "
-        f"{match.canonical_id} ({tier}, {correction})"
+        f"{match.canonical_id} via {entry_id} ({tier}, {correction}) "
+        f"{filter_of(match)}"
     )
+
+
+def filter_of(match: EntityMatch) -> dict[str, list[str]]:
+    """The filter the tenant's own word implied, straight off the match.
+
+    Always a mapping — empty when the entry declared none — so there is no
+    guard here, which is the whole point of it never being absent.
+    """
+    return narrow(match.metadata)
+
+
+def narrow(metadata: Metadata) -> dict[str, list[str]]:
+    """A filter value is a scalar or a set of scalars, so a consuming service that
+    wants every value as a list narrows on the type it was handed."""
+    narrowed: dict[str, list[str]] = {}
+    for key in metadata:
+        value: MetadataValue = metadata[key]
+        narrowed[key] = list(value) if isinstance(value, tuple) else [str(value)]
+    return narrowed
+
+
+def search_filter(entry: Entry) -> dict[str, list[str]]:
+    """The jargon-to-filter half of the mapping, read out of a held lexicon."""
+    return narrow(entry.metadata)
+
+
+def filters_by_entry(lexicon_path: Path) -> dict[str, dict[str, list[str]]]:
+    lexicon: Lexicon = Lexicon.from_file(lexicon_path)
+    return {
+        entry.canonical_id: search_filter(entry)
+        for entry in lexicon.entries.values()
+    }
 
 
 def main(lexicon_path: Path, prompt: str, locale: str) -> None:
@@ -79,6 +123,7 @@ def main(lexicon_path: Path, prompt: str, locale: str) -> None:
     print(report.prompt, report.locale, canonical_ids(report))
     for match in report.matches:
         print(describe(match))
+    print(filters_by_entry(lexicon_path))
 '''
 
 MISUSE = """\

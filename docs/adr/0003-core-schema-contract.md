@@ -2,7 +2,11 @@
 
 ## Status
 
-Accepted (2026-07-23)
+Accepted (2026-07-23). Its **data shapes** are refined by
+[ADR 0005](0005-entry-metadata-format.md): what `entities` keys is an *entry*,
+which names the entity it resolves to and may carry metadata. Everything else
+here — the protocol, the versioning rule, and the equivalence guarantee — stands
+unchanged, and ADR 0005 was written to keep that guarantee true on both sides.
 
 ## Context
 

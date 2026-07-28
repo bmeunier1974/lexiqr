@@ -37,7 +37,8 @@ GOLDEN = Path(__file__).resolve().parent / "report_equality.golden.json"
 #: The fixed fixture set: (lexicon path relative to the repo root, prompt,
 #: locale). Chosen to exercise the places a platform could plausibly diverge —
 #: accent folding, casefolding, a script-preserving language (Arabic), fuzzy
-#: correction, locale fallback, plurals, and the empty result — not just the
+#: correction, locale fallback, plurals, entries sharing one entity with distinct
+#: filters, and the empty result — not just the
 #: happy path. The order is fixed, so the serialized block is deterministic.
 FIXTURES: tuple[tuple[str, str, str], ...] = (
     ("examples/flooff.lexicon.json", "wo ist flooff", "de-DE"),
@@ -61,6 +62,20 @@ FIXTURES: tuple[tuple[str, str, str], ...] = (
     ("schema/fixtures/valid/acme-multilingual.lexicon.json", "wo ist منتج", "ar-EG"),
     ("schema/fixtures/valid/medien-de.lexicon.json", "wo ist flooff", "de-AT"),
     ("schema/fixtures/valid/medien-de.lexicon.json", "die rechnung", "de-AT"),
+    # Two entries resolving to one entity, each with its own filter: the fields a
+    # report carries beyond the entity are as much a cross-platform claim as the
+    # spans are, and a filter with a multi-valued key is where an ordering
+    # difference would show.
+    (
+        "schema/fixtures/valid/medien-shared-entity.lexicon.json",
+        "wo sind die filme und die serien",
+        "de-DE",
+    ),
+    (
+        "schema/fixtures/valid/medien-shared-entity.lexicon.json",
+        "wo ist der spielfim",
+        "de-DE",
+    ),
     ("examples/flooff.lexicon.json", "", "de-DE"),
 )
 

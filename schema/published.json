@@ -9,11 +9,11 @@
     "`$id` at it, and updating the record below. tests/test_schema_publication.py",
     "fails if the bytes drift from the record, so neither step can be skipped.",
     "",
-    "A package version bump does not move `$id` — the schema is versioned by",
+    "A package version bump does not move `$id` \u2014 the schema is versioned by",
     "its own format version, not by the release it happens to ship in."
   ],
   "lexicon.v1.schema.json": {
-    "publishedAt": "v0.0.1",
-    "sha256": "3c1e23a1c87cc341257efd8601ebb83e12252a8374db4a594b1c67e63cb298f3"
+    "publishedAt": "v1.1.0",
+    "sha256": "9d818d863ead0f140058287948c4947830ad770ca86869d79091f524aa8bef17"
   }
 }

@@ -118,6 +118,36 @@ def test_every_example_lexicon_demonstrates_the_schema_reference(example: Path) 
     assert document.get("$schema") == load(SCHEMA_PATH)["$id"]
 
 
+#: Every place in the repository that holds lexicon documents, so a fixture
+#: added to the corpus comes under the reference check without an edit here.
+CORPUS_ROOTS = (EXAMPLES, REPO_ROOT / "schema" / "fixtures")
+
+
+def corpus() -> list[Path]:
+    return sorted(
+        path for root in CORPUS_ROOTS for path in root.rglob("*.lexicon.json")
+    )
+
+
+@pytest.mark.parametrize(
+    "document", corpus(), ids=lambda p: str(p.relative_to(REPO_ROOT))
+)
+def test_no_lexicon_document_points_at_a_superseded_schema(document: Path) -> None:
+    """A republication that leaves a `$schema` behind is a half-done one.
+
+    A fixture still naming the previous tag validates against the *old* bytes,
+    so an editor would offer the old completions and the corpus would quietly
+    stop exercising the format the repository actually publishes. `$schema` is
+    optional, so this says nothing about a document that declares none — only
+    that one which does must name the current `$id`.
+    """
+    declared = load(document).get("$schema")
+    if declared is None:
+        return
+
+    assert declared == load(SCHEMA_PATH)["$id"]
+
+
 def test_the_authoring_guide_tells_an_author_what_they_need() -> None:
     """The audience never installs lexiqr and never writes Python, so the
     page has to carry the whole story: the URL, how to check a file with

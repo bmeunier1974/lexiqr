@@ -17,6 +17,12 @@ locales, and a mix of preferred singular (always), plural (most of the time),
 and a handful of alternates. Every surface form is unique within its locale, so
 the generated fixture never trips core's ambiguity check, and every form is a
 short word, so it never trips the pathological-length check.
+
+**Every entry carries a filter**, including a multi-valued one. The envelope is
+claimed for a lexicon that *uses* the feature — "adopting it costs nothing per
+request" is only tested if the fixture the gate measures declares metadata
+everywhere. It holds only while metadata stays a shared reference through the
+scan rather than a per-hit copy, which is exactly what this fixture would catch.
 """
 
 from __future__ import annotations
@@ -38,9 +44,16 @@ TARGET_SURFACE_FORMS = 1000
 #: The pointer the published fixtures carry, mirrored so the generated document
 #: looks like one an author would write.
 _SCHEMA_URL = (
-    "https://raw.githubusercontent.com/bmeunier1974/lexiqr/v0.0.1/"
+    "https://raw.githubusercontent.com/bmeunier1974/lexiqr/v1.1.0/"
     "schema/lexicon.v1.schema.json"
 )
+
+#: Filter values a generated entry may carry. Realistic tenant qualifications,
+#: and between them they cover every kind the value domain allows — string,
+#: number, boolean, and a set of strings — so the fixture exercises the list case,
+#: the only one with a per-value cost.
+_PRODUCT_TYPES = ("Movie", "Series", "Episode", "Clip", "Trailer")
+_GENRES = ("drama", "thriller", "comedy", "documentary", "kids")
 
 #: Locales the fixture spreads entities across — a multilingual tenant, which is
 #: what lexiqr exists for.
@@ -90,6 +103,12 @@ def generate_benchmark_lexicon(
     Deterministic in `seed`: same seed, byte-identical lexicon.
     """
     rng = random.Random(seed)
+    # A separate stream for filters, so declaring metadata does not perturb the
+    # words the vocabulary is drawn from. Otherwise adding a filter would silently
+    # regenerate the whole lexicon and any measurement taken before it would stop
+    # being comparable to one taken after — for a reason that has nothing to do
+    # with metadata.
+    filters = random.Random(seed + 1)
     used_by_locale: dict[str, set[str]] = {locale: set() for locale in _LOCALES}
     entities: dict[str, Any] = {}
     forms = 0
@@ -121,13 +140,33 @@ def generate_benchmark_lexicon(
             if alternates:
                 surface_forms["alternates"] = alternates
             locales[locale] = surface_forms
-        entities[canonical_id] = {"locales": locales}
+        entities[canonical_id] = {
+            "locales": locales,
+            "metadata": _filter(filters),
+        }
 
     return {
         "$schema": _SCHEMA_URL,
         "schemaVersion": "1",
         "defaultLocale": "de-DE",
         "entities": entities,
+    }
+
+
+def _filter(rng: random.Random) -> dict[str, Any]:
+    """One entry's filter: three scalars and a set, drawn from `rng`.
+
+    Every entry gets the same *shape* so the measurement is not sensitive to which
+    entries a prompt happened to hit, and every kind the value domain allows is
+    present so nothing about holding, hashing, or serializing a filter is left
+    unmeasured. Keys are emitted in sorted order, like everything else here.
+    """
+    genres = sorted(rng.sample(_GENRES, rng.randint(1, 3)))
+    return {
+        "active": rng.random() < 0.8,
+        "genre": genres,
+        "productType": rng.choice(_PRODUCT_TYPES),
+        "tier": rng.randint(1, 5),
     }
 
 

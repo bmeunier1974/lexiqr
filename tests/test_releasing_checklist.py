@@ -36,6 +36,23 @@ def test_it_lists_the_multi_tenant_recipe_review_as_a_manual_step() -> None:
     assert "[human]" in text  # called out as a human judgment, not a CI check
 
 
+def test_it_documents_the_schema_republication_procedure() -> None:
+    """Changing a published schema's bytes is a republication, not an edit.
+
+    The test that enforces it only says *something drifted*; it cannot say which
+    four things have to move together. Left undocumented, the next maintainer
+    reconstructs the procedure from a failing assertion — so the steps, and the
+    test that guards them, are written down here.
+    """
+    text = _releasing()
+
+    assert "republication" in text.lower()
+    assert "$id" in text
+    assert "published.json" in text
+    assert "sha256" in text.lower()
+    assert "test_schema_publication.py" in text
+
+
 def test_it_documents_the_pypi_registration_and_the_tag_push_steps() -> None:
     text = _releasing()
 

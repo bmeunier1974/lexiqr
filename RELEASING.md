@@ -46,6 +46,38 @@ API.
   python scripts/release_consistency.py vX.Y.Z
   ```
 
+## If this release changes the published JSON Schema
+
+A published schema version is **immutable**: lexicon authors point their tooling
+at the `$id` URL and expect it to keep resolving to the same document forever.
+So editing `schema/lexicon.v1.schema.json` is not an edit — it is a
+**republication**, and four things move together or none of them do.
+`tests/test_schema_publication.py` fails when they disagree, but it can only tell
+you *something drifted*; these are the steps.
+
+1. **[human] Publish at a new tag.** The old tag keeps resolving to the old
+   bytes — that is the guarantee, and it is why nothing is ever overwritten. The
+   new tag is normally the release being cut; it must not be one the project has
+   not reached (a `$id` ahead of `version` in `pyproject.toml` resolves to
+   nothing, and the gate rejects it).
+2. **[human] Repoint `$id`** in the schema at that tag.
+3. **[human] Refresh the record.** In `schema/published.json`, set
+   `publishedAt` to the new tag and `sha256` to the digest of the amended file —
+   computed **last**, after every other edit, since repointing `$id` changes the
+   bytes too:
+
+   ```bash
+   python -c "import hashlib,pathlib;print(hashlib.sha256(pathlib.Path('schema/lexicon.v1.schema.json').read_bytes()).hexdigest())"
+   ```
+
+4. **[human] Update the URLs authors were told to use.** Every lexicon document
+   in the repository that declares `$schema` — the examples included — and the
+   URL quoted in [docs/lexicon-authoring.md](docs/lexicon-authoring.md).
+
+A version bump on its own does **not** move `$id`. That is immutability working:
+the schema is versioned by its own format version, not by the release it happens
+to ship in.
+
 ## Human prerequisites CI cannot verify
 
 - **[human] Multi-tenant recipe review.** The recipe in the

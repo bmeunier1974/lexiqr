@@ -91,10 +91,50 @@ pathologically slow. Rejecting it at load turns a request-path hang into a
 validation-time error the author can act on, which is where a bad lexicon should
 fail.
 
+## 5. A `canonicalId` may not point at an entry that resolves somewhere else
+
+**Fixture:** `chained-canonical-id-target.lexicon.json`
+
+An entry may name the entity it resolves to, and several entries may name the
+same one. What it may not name is another entry that itself resolves onward:
+`feature_film` → `movie` → `product`. A target must be a **leaf** — an entity, or
+an entry that resolves to itself.
+
+*Why the schema cannot express it.* JSON Schema validates each entity object
+against `$defs/entity` on its own. Deciding whether a `canonicalId` names a leaf
+means reading the *other* entity under that key and looking at its `canonicalId` —
+a comparison across siblings, which is exactly what JSON Schema cannot do.
+
+*Why core rejects rather than following the chain.* Neither reading is honest.
+Resolving transitively invents a rule the format does not state, and every author
+would then have to know how deep it goes. Stopping at the first hop makes the
+match report `movie` — an entity no backend queries — which is the very failure
+the entry model exists to remove. Refusing at load time puts the one-line fix
+where it belongs: name `product` directly.
+
+## 6. A metadata value may not be only whitespace
+
+**Fixture:** `blank-metadata-value.lexicon.json`
+
+`"   "` is a string of length three, so the `metadata` subschema's `minLength: 1`
+accepts it — exactly as it accepts a blank surface form (check 3).
+
+*Why the schema cannot express it.* It could, with a pattern, and it is left out
+for the same reason: a metadata value is tenant-authored text in whatever script
+the tenant writes, and a regex built around Latin assumptions would refuse
+legitimate values. Core carries the check instead.
+
+*Why core rejects.* Metadata is carried onto every match the entry produces and
+read by a consuming service building a query. A value that is only spaces is not
+something a backend can act on, but it is not nothing either: it becomes a live
+filter that silently narrows every query, and the symptom is a search that quietly
+returns less than it should. That is far more expensive to find later than at load
+time.
+
 ---
 
 ## For lexicon authors
 
 If offline validation passes and lexiqr still rejects your file, the error
 message names the entity, locale, and field — and the reason will be one of the
-four above. Nothing else in lexiqr rejects a schema-valid document.
+six above. Nothing else in lexiqr rejects a schema-valid document.

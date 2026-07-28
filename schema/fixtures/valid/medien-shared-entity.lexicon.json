@@ -1,0 +1,32 @@
+{
+  "$schema": "https://raw.githubusercontent.com/bmeunier1974/lexiqr/v1.1.0/schema/lexicon.v1.schema.json",
+  "schemaVersion": "1",
+  "defaultLocale": "de-DE",
+  "entities": {
+    "movie": {
+      "canonicalId": "product",
+      "metadata": { "productType": "Movie", "genre": ["drama", "thriller"] },
+      "locales": {
+        "de-DE": {
+          "preferred": { "singular": "film", "plural": "filme" },
+          "alternates": ["spielfilm"]
+        },
+        "en-GB": {
+          "preferred": { "singular": "movie", "plural": "movies" }
+        }
+      }
+    },
+    "series": {
+      "canonicalId": "product",
+      "metadata": { "productType": "Series", "episodic": true },
+      "locales": {
+        "de-DE": {
+          "preferred": { "singular": "serie", "plural": "serien" }
+        },
+        "en-GB": {
+          "preferred": { "singular": "series" }
+        }
+      }
+    }
+  }
+}
