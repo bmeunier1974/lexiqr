@@ -555,6 +555,70 @@ def test_the_run_survives_a_default_stdout_encoding_that_cannot_hold_arabic() ->
     )
 
 
+def test_the_transcript_returns_a_sentence_in_position_order() -> None:
+    """Section 9's ordering, observed against the resolver rather than the golden.
+
+    Every earlier section resolves a single word. This is the one that says what a
+    sentence does, and the ordering is the part a caller walks alongside their
+    text — so it is asserted on the spans the resolver returns, not on the order
+    the transcript happens to print.
+    """
+    report = EntityResolver.from_file(LEXICON).transform(
+        demo.A_SENTENCE_WITH_TWO_ENTITIES, "de-DE"
+    )
+    printed = transcript_of("a_sentence_is_ordered_by_position_and_an_overlap_resolved")
+    spans = [match.span for match in report.matches]
+
+    assert len(report.matches) == 2, f"the sentence resolved to {spans}"
+    assert len({match.canonical_id for match in report.matches}) == 2, (
+        "both matches name one entity, so the section is not showing two"
+    )
+    assert spans == sorted(spans), (
+        f"the report's matches are not in position order: {spans}"
+    )
+    for match in report.matches:
+        assert collapsed(demo.render_match(match)) in printed, (
+            f"the section does not show the match at {match.span}"
+        )
+
+
+def test_the_transcript_resolves_an_overlap_to_the_longest_span() -> None:
+    """Section 9's overlap, and the proof that the shorter form was really dropped.
+
+    Asserting "one match came back" says nothing on its own — the shorter form
+    might simply not be in the lexicon. So the shorter form is resolved on its own
+    here, and must match: its absence from the overlapping prompt is then a
+    resolution decision rather than a gap in the corpus.
+    """
+    resolver = EntityResolver.from_file(LEXICON)
+    printed = transcript_of("a_sentence_is_ordered_by_position_and_an_overlap_resolved")
+
+    overlapping = resolver.transform(demo.A_PROMPT_WITH_AN_OVERLAP, "de-DE")
+    shorter = resolver.transform(demo.THE_SHORTER_FORM_ALONE, "de-DE")
+
+    assert len(shorter.matches) == 1, (
+        f"the shorter form does not resolve on its own, so nothing was dropped: "
+        f"{shorter.matches}"
+    )
+    assert len(overlapping.matches) == 1, (
+        f"the overlap left {len(overlapping.matches)} matches, not one: "
+        f"{overlapping.matches}"
+    )
+
+    won = overlapping.matches[0]
+    lost = shorter.matches[0]
+    assert lost.surface_form in won.surface_form, (
+        f"{lost.surface_form!r} is not contained in {won.surface_form!r}, so these "
+        f"two forms never overlapped"
+    )
+    assert won.span[1] - won.span[0] > lost.span[1] - lost.span[0], (
+        f"the surviving span {won.span} is not longer than the one it displaced"
+    )
+    assert collapsed(demo.render_match(won)) in printed, (
+        f"the section does not show the match that won the overlap: {won}"
+    )
+
+
 def test_the_run_records_how_its_golden_is_regenerated() -> None:
     """A golden nobody knows how to rebuild is a golden that gets hand-edited.
 

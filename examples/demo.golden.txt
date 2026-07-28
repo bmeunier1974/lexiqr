@@ -135,4 +135,23 @@ held      one declared form matched by two Latin spellings, and every span point
           characters the user typed rather than at a folded copy of them. Arabic is not
           folded to ASCII, so its script survives the round trip.
 
+--- 9. A sentence returns in position order, and an overlap keeps the longest [C4] ---
+
+claim     A report's matches come back ordered by position, so a caller can walk them
+          alongside the text they came from. Where one declared label sits inside
+          another, the longest span wins: a tenant who wrote a precise multi-word label
+          meant that label, not the shorter one inside it.
+sentence  "wo ist die rechnung für den film"
+match     invoice ← "rechnung"  span=(11, 19)  tier=preferred  locale=de-DE
+match     product ← "film"  span=(28, 32)  tier=preferred  locale=de-DE  entry=movie
+          filter={genre=drama|thriller, productType=Movie}
+order     (11, 19), (28, 32) — ascending, in the order the report returned them
+overlap   "wo ist der film des jahres" → 1 match
+match     award ← "film des jahres"  span=(11, 26)  tier=preferred  locale=de-DE
+shorter   "wo ist der film" → product ← "film"  span=(11, 15)  tier=preferred
+          locale=de-DE  entry=movie  filter={genre=drama|thriller, productType=Movie}
+held      the sentence's two entities came back in position order. The shorter form
+          'film' resolves perfectly well on its own, so its absence from the overlapping
+          prompt is a decision lexiqr made, not a gap in the lexicon.
+
 OK: every section held.

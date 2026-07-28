@@ -696,6 +696,84 @@ def normalization_folds_accents_and_preserves_arabic() -> None:
     )
 
 
+#: A sentence rather than a word: two entities, in two places.
+A_SENTENCE_WITH_TWO_ENTITIES = "wo ist die rechnung für den film"
+
+#: A prompt naming a multi-word label that contains a shorter declared form, and
+#: that shorter form on its own. The pair is what makes the overlap decision
+#: visible: the shorter form matches when nothing longer covers it.
+A_PROMPT_WITH_AN_OVERLAP = "wo ist der film des jahres"
+THE_SHORTER_FORM_ALONE = "wo ist der film"
+
+
+def a_sentence_is_ordered_by_position_and_an_overlap_resolved() -> None:
+    """A sentence returns in position order, and an overlap keeps the longest [C4]
+
+    What a real sentence does, rather than what a word does — including the case
+    where one declared label sits inside another.
+    """
+    resolver = EntityResolver.from_file(LEXICON)
+    sentence = resolver.transform(A_SENTENCE_WITH_TWO_ENTITIES, "de-DE")
+    overlapping = resolver.transform(A_PROMPT_WITH_AN_OVERLAP, "de-DE")
+    shorter = resolver.transform(THE_SHORTER_FORM_ALONE, "de-DE")
+
+    emit(
+        "claim",
+        "A report's matches come back ordered by position, so a caller can walk "
+        "them alongside the text they came from. Where one declared label sits "
+        "inside another, the longest span wins: a tenant who wrote a precise "
+        "multi-word label meant that label, not the shorter one inside it.",
+    )
+    emit("sentence", f'"{A_SENTENCE_WITH_TWO_ENTITIES}"')
+    for match in sentence.matches:
+        emit("match", render_match(match))
+    emit(
+        "order",
+        f"{', '.join(str(match.span) for match in sentence.matches)} — ascending, in "
+        f"the order the report returned them",
+    )
+    emit("overlap", f'"{A_PROMPT_WITH_AN_OVERLAP}" → {len(overlapping.matches)} match')
+    emit("match", render_match(overlapping.matches[0]))
+    emit("shorter", f'"{THE_SHORTER_FORM_ALONE}" → {render_match(shorter.matches[0])}')
+    emit(
+        "held",
+        f"the sentence's two entities came back in position order. The shorter form "
+        f"{shorter.matches[0].surface_form!r} resolves perfectly well on its own, so "
+        f"its absence from the overlapping prompt is a decision lexiqr made, not a "
+        f"gap in the lexicon.",
+    )
+
+    spans = [match.span for match in sentence.matches]
+    assert len(sentence.matches) == 2, (
+        f"the sentence was meant to hold two entities and gave {spans}"
+    )
+    assert len({match.canonical_id for match in sentence.matches}) == 2, (
+        "both matches name one entity, so this shows one entity twice rather than "
+        "two entities in one prompt"
+    )
+    assert spans == sorted(spans), (
+        f"the matches are not in ascending position order: {spans}"
+    )
+
+    assert len(shorter.matches) == 1, (
+        f"the shorter form does not resolve on its own, so the overlap below drops "
+        f"nothing: {shorter.matches}"
+    )
+    assert len(overlapping.matches) == 1, (
+        f"the overlap left {len(overlapping.matches)} matches; the shorter form "
+        f"inside the longer one should not be reported alongside it"
+    )
+
+    won, lost = overlapping.matches[0], shorter.matches[0]
+    assert lost.surface_form in won.surface_form, (
+        f"{lost.surface_form!r} is not inside {won.surface_form!r}, so these two "
+        f"forms never overlapped and nothing was resolved"
+    )
+    assert won.span[1] - won.span[0] > lost.span[1] - lost.span[0], (
+        f"the surviving span {won.span} is not longer than the {lost.span} it displaced"
+    )
+
+
 # --- The driver --------------------------------------------------------------
 
 
@@ -724,6 +802,7 @@ SECTIONS: tuple[Section, ...] = (
     a_typo_carries_its_correction_and_fuzzy_off_does_not,
     an_undeclared_locale_variant_walks_the_fallback_chain,
     normalization_folds_accents_and_preserves_arabic,
+    a_sentence_is_ordered_by_position_and_an_overlap_resolved,
 )
 
 
