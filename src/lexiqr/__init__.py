@@ -5,7 +5,8 @@ returns (ADR 0002) — plus the two things a caller must be able to name without
 reaching behind it: the lexicon model `EntityResolver` takes, and the two limits
 lexiqr documents.
 
-`Lexicon` (with `SurfaceForms`, the shape it holds per entity and locale) is the
+`Lexicon` (with `Entry`, the named set of forms an entity is keyed by, and
+`SurfaceForms`, the shape an entry holds per locale) is the
 declared parameter type of the constructor, and validation *is* construction —
 `Lexicon.from_file` / `from_dict` either return a lexicon core can trust or raise
 `ValidationError` naming where the document is wrong. Exporting it lets a lexicon
@@ -23,7 +24,7 @@ stay internal, and can change in a patch.
 """
 
 from lexiqr.errors import MalformedDocumentError, ValidationError
-from lexiqr.lexicon import MAX_SURFACE_FORM_LENGTH, Lexicon, SurfaceForms
+from lexiqr.lexicon import MAX_SURFACE_FORM_LENGTH, Entry, Lexicon, SurfaceForms
 from lexiqr.resolver import MAX_PROMPT_LENGTH, EntityResolver
 from lexiqr.serialization import deserialize_report, serialize_report
 from lexiqr.types import EntityMatch, MatchReport, ScoreTier
@@ -33,6 +34,7 @@ __all__ = [
     "MAX_SURFACE_FORM_LENGTH",
     "EntityMatch",
     "EntityResolver",
+    "Entry",
     "Lexicon",
     "MalformedDocumentError",
     "MatchReport",

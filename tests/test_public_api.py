@@ -23,6 +23,7 @@ from conftest import FLOOFF_LEXICON
 PUBLIC_SURFACE = {
     "EntityMatch",
     "EntityResolver",
+    "Entry",
     "Lexicon",
     "MAX_PROMPT_LENGTH",
     "MAX_SURFACE_FORM_LENGTH",
@@ -123,14 +124,29 @@ def test_a_document_that_parsed_but_is_wrong_is_not_a_malformed_document() -> No
 
 
 def test_a_lexicon_loads_and_validates_through_exported_names_alone() -> None:
-    from lexiqr import Lexicon, SurfaceForms
+    from lexiqr import Entry, Lexicon, SurfaceForms
 
     lexicon = Lexicon.from_file(FLOOFF_LEXICON)
 
     assert lexicon.default_locale == "de-DE"
-    forms = lexicon.entities["product"]["de-DE"]
+    entry = lexicon.entries["product"]
+    assert isinstance(entry, Entry)
+    forms = entry.locales["de-DE"]
     assert isinstance(forms, SurfaceForms)
     assert forms.preferred_singular == "flooff"
+
+
+def test_an_entry_names_itself_and_the_entity_it_resolves_to() -> None:
+    """Reading a held lexicon means reading entries, so `Entry` is nameable.
+
+    A strictly-typed consumer that walks `lexicon.entries` needs the type of what
+    it finds there; without the export it could only name it as `object`.
+    """
+    from lexiqr import Lexicon
+
+    entry = Lexicon.from_file(FLOOFF_LEXICON).entries["product"]
+
+    assert (entry.entry_id, entry.canonical_id) == ("product", "product")
 
 
 def test_loading_an_invalid_lexicon_faults_where_the_document_is_wrong() -> None:

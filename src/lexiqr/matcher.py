@@ -146,7 +146,7 @@ def _fuzzy_pass(
             continue
         best = _best_candidate(token, single_forms)
         if best is not None:
-            hits.append(_hit(best, span))
+            hits.append(Hit.of(best, span))
     for (left, left_span), (right, right_span) in zip(tokens, tokens[1:], strict=False):
         if _overlaps_any(left_span, covered) or _overlaps_any(right_span, covered):
             continue
@@ -155,7 +155,7 @@ def _fuzzy_pass(
             f"{right} {left}", multi_forms
         )
         if best is not None:
-            hits.append(_hit(best, span))
+            hits.append(Hit.of(best, span))
     return tuple(hits)
 
 
@@ -166,16 +166,6 @@ def _edit_budget(folded_length: int) -> int:
     if folded_length >= _MEDIUM_FORM:
         return 1
     return 0
-
-
-def _hit(form: SurfaceForm, span: tuple[int, int]) -> Hit:
-    """A near-miss, reported in the shape and coordinates an exact hit uses."""
-    return Hit(
-        canonical_id=form.canonical_id,
-        surface_form=form.surface_form,
-        span=span,
-        score_tier=form.score_tier,
-    )
 
 
 def _fuzzy_candidates(forms: tuple[SurfaceForm, ...]) -> tuple[SurfaceForm, ...]:

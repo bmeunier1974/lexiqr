@@ -44,9 +44,30 @@ class Hit:
     """
 
     canonical_id: str
+    #: The entry this form was declared under. Equal to the canonical ID for an
+    #: entry that resolves to itself; what separates two candidates of one entity
+    #: when nothing else does (see `lexiqr.ordering`).
+    entry_id: str
     surface_form: str
     span: tuple[int, int]
     score_tier: ScoreTier
+
+    @classmethod
+    def of(cls, form: SurfaceForm, span: tuple[int, int]) -> Hit:
+        """This compiled form, found at `span`.
+
+        Both passes report through here — the exact scan when the automaton
+        reaches a form's last character, the fuzzy pass when a token is close
+        enough to one — so what a hit carries from the form it came from is
+        decided once, and neither pass can carry less than the other.
+        """
+        return cls(
+            canonical_id=form.canonical_id,
+            entry_id=form.entry_id,
+            surface_form=form.surface_form,
+            span=span,
+            score_tier=form.score_tier,
+        )
 
 
 @dataclass(frozen=True)
@@ -62,6 +83,8 @@ class SurfaceForm:
     #: The form as the normalizer folded it — the alphabet the scan works in.
     folded: str
     canonical_id: str
+    #: The entry this form was declared under; see `Hit.entry_id`.
+    entry_id: str
     #: The form as the tenant declared it, carried untouched so a match can name
     #: what it resolved to in the tenant's own spelling.
     surface_form: str
@@ -71,10 +94,11 @@ class SurfaceForm:
 @dataclass
 class _Node:
     children: dict[str, _Node] = field(default_factory=dict)
-    #: Forms ending at this node, as (folded length, canonical ID, surface
-    #: form, tier). Several, because two entities may declare the same surface
-    #: form, and one entity may declare it in two tiers.
-    outputs: list[tuple[int, str, str, ScoreTier]] = field(default_factory=list)
+    #: The compiled forms ending at this node — the forms themselves, not a
+    #: flattened copy of their fields, so what a hit carries is decided once, on
+    #: `SurfaceForm`. Several, because two entries may declare the same surface
+    #: form, and one entry may declare it in two tiers.
+    outputs: list[SurfaceForm] = field(default_factory=list)
     fail: _Node | None = None
 
 
@@ -94,31 +118,43 @@ class SurfaceFormIndex:
         """
         root = _Node()
         forms: list[SurfaceForm] = []
-        for canonical_id, locales in lexicon.entities.items():
-            entity_forms = locales.get(locale)
+        for entry in lexicon.entries.values():
+            entity_forms = entry.locales.get(locale)
             if entity_forms is None:
                 continue
+            canonical_id = entry.canonical_id
             seen: set[str] = set()
-            for surface_form, tier in _tiered_surface_forms(canonical_id, entity_forms):
+            for surface_form, tier in _tiered_surface_forms(
+                entry.entry_id, entity_forms
+            ):
                 folded = normalize_text(surface_form, locale)
-                # An entity whose canonical ID reads the same as one of its
-                # labels ("invoice") declared one form, not two candidates at
-                # different tiers. Best tier first means the first wins.
+                # An entry whose ID reads the same as one of its own labels
+                # ("invoice") declared one form, not two candidates at different
+                # tiers. Best tier first means the first wins.
                 #
                 # The same rule settles a genuine tie determinism depends on: one
-                # entity declaring two forms that fold to the same text ("café"
+                # entry declaring two forms that fold to the same text ("café"
                 # and "cafe" both fold to "cafe"). They would claim the identical
                 # span at the identical tier, and nothing about the text or the
-                # entity separates them — so the ordering closes here, on
-                # declaration order, keeping the first-declared and never
-                # emitting a second candidate that a later stage would have to
-                # break by whichever it happened to see first. Declaration order
-                # is stable across runs, machines, and hash seeds; this is a
-                # deliberate, deterministic behavior decision, not incidental.
+                # entry separates them — not even `ordering.identity`, which is
+                # per-entry and so cannot tell one entry's two forms apart. So
+                # the ordering closes here, on declaration order, keeping the
+                # first-declared and never emitting a second candidate that a
+                # later stage would have to break by whichever it happened to see
+                # first. Declaration order is stable across runs, machines, and
+                # hash seeds; this is a deliberate, deterministic behavior
+                # decision, not incidental.
                 if folded and folded not in seen:
                     seen.add(folded)
-                    _insert(root, folded, canonical_id, surface_form, tier)
-                    forms.append(SurfaceForm(folded, canonical_id, surface_form, tier))
+                    compiled = SurfaceForm(
+                        folded=folded,
+                        canonical_id=canonical_id,
+                        entry_id=entry.entry_id,
+                        surface_form=surface_form,
+                        score_tier=tier,
+                    )
+                    _insert(root, compiled)
+                    forms.append(compiled)
         _link_failures(root)
         return cls(root, tuple(forms))
 
@@ -136,44 +172,41 @@ class SurfaceFormIndex:
         node = self._root
         for position, character in enumerate(text):
             node = _advance(node, character, self._root)
-            for length, canonical_id, surface_form, tier in _outputs(node):
-                start = position - length + 1
+            for form in _outputs(node):
+                start = position - len(form.folded) + 1
                 if _stands_alone(text, start, position + 1):
-                    hits.append(
-                        Hit(
-                            canonical_id=canonical_id,
-                            surface_form=surface_form,
-                            span=(start, position + 1),
-                            score_tier=tier,
-                        )
-                    )
+                    hits.append(Hit.of(form, (start, position + 1)))
         return tuple(hits)
 
 
 def _tiered_surface_forms(
-    canonical_id: str, forms: SurfaceForms
+    entry_id: str, forms: SurfaceForms
 ) -> list[tuple[str, ScoreTier]]:
-    """Every way a tenant's users might name this entity, best form first.
+    """Every way a tenant's users might name this entry, best form first.
 
-    The canonical ID is included as a surface form of last resort: a prompt
-    that names the entity outright should still resolve, but a tenant's own
-    vocabulary outranks the identifier they never see.
+    The **entry ID** is included as a surface form of last resort: a prompt that
+    names the entry outright should still resolve, but a tenant's own vocabulary
+    outranks the identifier they never see.
+
+    The entry ID, and never the canonical ID it resolves to. Otherwise every
+    entry sharing a target would claim that target as a canonical-tier form, and
+    they would collide over a word no tenant wrote — the word "product" is
+    matchable exactly when an entry is *named* `product`. For an entry that
+    resolves to itself the two are the same string, so nothing changes.
     """
     tiered = [(forms.preferred_singular, ScoreTier.PREFERRED)]
     if forms.preferred_plural is not None:
         tiered.append((forms.preferred_plural, ScoreTier.PREFERRED))
     tiered.extend((alternate, ScoreTier.ALTERNATE) for alternate in forms.alternates)
-    tiered.append((canonical_id, ScoreTier.CANONICAL))
+    tiered.append((entry_id, ScoreTier.CANONICAL))
     return tiered
 
 
-def _insert(
-    root: _Node, folded: str, canonical_id: str, surface_form: str, tier: ScoreTier
-) -> None:
+def _insert(root: _Node, form: SurfaceForm) -> None:
     node = root
-    for character in folded:
+    for character in form.folded:
         node = node.children.setdefault(character, _Node())
-    node.outputs.append((len(folded), canonical_id, surface_form, tier))
+    node.outputs.append(form)
 
 
 def _link_failures(root: _Node) -> None:
@@ -197,13 +230,13 @@ def _advance(node: _Node, character: str, root: _Node) -> _Node:
     return node.children.get(character, root)
 
 
-def _outputs(node: _Node) -> list[tuple[int, str, str, ScoreTier]]:
+def _outputs(node: _Node) -> list[SurfaceForm]:
     """Forms ending here, plus those ending at every suffix of here.
 
     A node's own outputs are not the whole story: "ticket" ends inside
     "support ticket", and both are occurrences the resolver must see.
     """
-    found: list[tuple[int, str, str, ScoreTier]] = []
+    found: list[SurfaceForm] = []
     current: _Node | None = node
     while current is not None:
         found.extend(current.outputs)

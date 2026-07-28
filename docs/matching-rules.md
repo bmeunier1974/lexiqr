@@ -149,18 +149,22 @@ resolved by these rules, applied in order until one of them decides:
    "ticket".
 2. **Then the better score tier wins** — preferred over alternate over canonical.
 3. **Then the earliest start wins.**
-4. **Then the lower canonical ID wins**, compared as text.
+4. **Then the lower canonical ID wins**, compared as text — and if the two
+   candidates resolve to the *same* entity, **the lower entry ID**.
 
 Rules 1–3 encode a judgement about what a lexicon author meant. Rule 4 does not:
 it exists so that a case with nothing left to distinguish it still resolves the
 same way on every machine, rather than following whatever order the scan
 happened to produce.
 
-Rule 4 is rarely reached, because a lexicon in which two entities claim the same
+Rule 4 is rarely reached, because a lexicon in which two entries claim the same
 surface form in one locale is [refused at load time](lexicon-semantic-checks.md).
 That check compares casefolded text, so forms differing only by accent —
-`épisode` and `episode` in two different entities — pass it and then collide
-once folded. Rule 4 is what settles those.
+`épisode` and `episode` in two different entries — pass it and then collide
+once folded. Rule 4 is what settles those. Its second half exists because
+[several entries may resolve to one entity](lexicon-authoring.md): two such
+candidates agree on the canonical ID, and the entry each was declared under is
+then the only thing left to choose between them.
 
 These four rules order matches of the **same kind**. When an exact match and a
 fuzzy one (§8) claim overlapping text, kind is asked first and the exact match
@@ -232,8 +236,8 @@ ranked by a totally ordered rule, applied in order until one decides:
 4. **Then the earliest start position**, which orders the matches the pass emits.
 
 No tie falls through to iteration order: two forms that are otherwise identical
-under these rules are settled the same way — by the lower canonical ID, as in
-rule 6.4 — on every run, machine, and Python version.
+under these rules are settled the same way — by canonical ID and then entry ID,
+as in rule 6.4 — on every run, machine, and Python version.
 
 ### Phrases tolerate the same errors, including swapped words
 

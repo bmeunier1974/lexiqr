@@ -5,15 +5,21 @@ exactly where the document is wrong (ADR 0002, ADR 0003). Callers hand over a
 JSON file path or a parsed dict and get back something core can trust; nothing
 downstream of here re-checks the data.
 
+What the document keys under `entities` is read as an **entry**: a named set of
+surface forms plus the entity it resolves to. The two are the same identifier
+unless the entry says otherwise, which is why a lexicon written before entries
+existed means exactly what it always meant.
+
 Faults are reported with whatever coordinates they have. A bad `entities`
-belongs to the document, a bad locale key belongs to an entity, a bad surface
-form belongs to an entity *and* a locale — and the coordinates a fault does not
+belongs to the document, a bad locale key belongs to an entry, a bad surface
+form belongs to an entry *and* a locale — and the coordinates a fault does not
 have stay `None` rather than being invented.
 """
 
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -35,11 +41,18 @@ SCHEMA_VERSION = "1"
 #: docs/lexicon-semantic-checks.md; changing it is a semver-visible change.
 MAX_SURFACE_FORM_LENGTH = 128
 
+#: What an identifier may be spelled with — the published schema's
+#: `$defs/canonicalId`, mirrored here so both sides of the ADR 0003 contract give
+#: the same verdict. Both an entry ID and the `canonicalId` it resolves to are
+#: identifiers, and both are checked: core used to accept any string as a key,
+#: which was looser than the schema an author validates against offline.
+_IDENTIFIER = re.compile(r"^[A-Za-z0-9_.-]+$")
+
 #: Keys the v1 format defines, mirroring the schema's `additionalProperties`
 #: bans. A key outside these is a typo, and a typo silently ignored is a
 #: surface form the tenant believes is live and isn't.
 _DOCUMENT_KEYS = frozenset({"$schema", "schemaVersion", "defaultLocale", "entities"})
-_ENTITY_KEYS = frozenset({"locales"})
+_ENTITY_KEYS = frozenset({"canonicalId", "locales"})
 _SURFACE_FORM_KEYS = frozenset({"preferred", "alternates"})
 _PREFERRED_KEYS = frozenset({"singular", "plural"})
 
@@ -54,12 +67,29 @@ class SurfaceForms:
 
 
 @dataclass(frozen=True)
+class Entry:
+    """One named set of surface forms, and the entity it resolves to.
+
+    The key an entity object sits under in the document is the **entry ID**: the
+    tenant's name for this way of naming the thing. The **canonical ID** is what a
+    match resolves to — the entity a backend actually queries — and it defaults to
+    the entry ID, so a lexicon that never mentions a target says exactly what it
+    always said. Several entries may resolve to one canonical ID: "movie" and
+    "series" can both be `product`.
+    """
+
+    entry_id: str
+    canonical_id: str
+    locales: dict[str, SurfaceForms]
+
+
+@dataclass(frozen=True)
 class Lexicon:
     """A tenant's jargon-to-entity mapping, as core sees it."""
 
     schema_version: str
     default_locale: str
-    entities: dict[str, dict[str, SurfaceForms]]
+    entries: dict[str, Entry]
 
     @classmethod
     def from_dict(cls, document: dict[str, Any]) -> Lexicon:
@@ -87,7 +117,7 @@ class Lexicon:
         if not isinstance(entities, dict):
             raise _fault(
                 "entities",
-                f"must be an object keyed by canonical ID, not {_kind(entities)}",
+                f"must be an object keyed by entry ID, not {_kind(entities)}",
             )
         if not entities:
             raise _fault(
@@ -95,14 +125,14 @@ class Lexicon:
             )
 
         parsed = {
-            canonical_id: _locales(entity, canonical_id)
-            for canonical_id, entity in entities.items()
+            entry_id: _entry(entity, entry_id) for entry_id, entity in entities.items()
         }
+        _reject_chained_targets(parsed)
         _reject_ambiguous_surface_forms(parsed)
         return cls(
             schema_version=SCHEMA_VERSION,
             default_locale=default_locale,
-            entities=parsed,
+            entries=parsed,
         )
 
     @classmethod
@@ -130,15 +160,41 @@ class Lexicon:
         return cls.from_dict(document)
 
 
-def _locales(entity: Any, canonical_id: str) -> dict[str, SurfaceForms]:
+def _entry(entity: Any, entry_id: str) -> Entry:
+    """One entity object, read as the entry it is: a target and its forms."""
     if not isinstance(entity, dict):
         raise _fault(
             "entities",
-            f"maps {canonical_id!r} to {_kind(entity)}, not an entity object",
-            canonical_id=canonical_id,
+            f"maps {entry_id!r} to {_kind(entity)}, not an entity object",
+            canonical_id=entry_id,
         )
-    _reject_unknown_keys(entity, _ENTITY_KEYS, f"entity {canonical_id!r}", canonical_id)
+    if not _IDENTIFIER.fullmatch(entry_id):
+        raise _fault(
+            "entities",
+            f"has key {entry_id!r}, which is not a well-formed identifier "
+            f"(letters, digits, '_', '.' and '-')",
+        )
+    _reject_unknown_keys(entity, _ENTITY_KEYS, f"entity {entry_id!r}", entry_id)
 
+    # Omitted means "this entry resolves to itself", which is what every lexicon
+    # written before the field existed says, so no author names an entity twice.
+    canonical_id = entity.get("canonicalId", entry_id)
+    if not isinstance(canonical_id, str) or not _IDENTIFIER.fullmatch(canonical_id):
+        raise _fault(
+            "canonicalId",
+            f"is {canonical_id!r}, which is not a well-formed identifier "
+            f"(letters, digits, '_', '.' and '-')",
+            canonical_id=entry_id,
+        )
+
+    return Entry(
+        entry_id=entry_id,
+        canonical_id=canonical_id,
+        locales=_locales(entity, entry_id),
+    )
+
+
+def _locales(entity: dict[str, Any], canonical_id: str) -> dict[str, SurfaceForms]:
     locales = entity.get("locales")
     if not isinstance(locales, dict):
         raise _fault(
@@ -241,32 +297,91 @@ def _surface_forms(forms: Any, canonical_id: str, locale: str) -> SurfaceForms:
     )
 
 
+def _reject_chained_targets(entries: dict[str, Entry]) -> None:
+    """Refuse a lexicon whose entity resolves through another entry.
+
+    Beyond the schema, which validates each entity object on its own and so
+    cannot compare a value in one against the key of another (see
+    docs/lexicon-semantic-checks.md).
+
+    A target must be a **leaf**. `feature_film` → `movie` → `product` has no
+    honest reading: following the chain invents a rule the format does not state,
+    and stopping at the first hop leaves a match reporting `movie`, which is not
+    an entity any backend queries. Pointing at an entry that resolves to *itself*
+    is fine — that entry is the entity.
+    """
+    for entry_id, entry in entries.items():
+        target = entries.get(entry.canonical_id)
+        if target is None or target.canonical_id == target.entry_id:
+            continue
+        raise _fault(
+            "canonicalId",
+            f"resolves to {entry.canonical_id!r}, which is itself an entry "
+            f"resolving to {target.canonical_id!r}; a target must be an entity, "
+            f"not another entry — name {target.canonical_id!r} directly",
+            canonical_id=entry_id,
+        )
+
+
 def _reject_ambiguous_surface_forms(
-    entities: dict[str, dict[str, SurfaceForms]],
+    entries: dict[str, Entry],
 ) -> None:
-    """Refuse a lexicon in which one word could resolve to two entities.
+    """Refuse a lexicon in which one word could resolve to two entries.
 
     Beyond the schema, which cannot see across entities (see
     docs/lexicon-semantic-checks.md). Determinism is a headline guarantee, and
     there is no defensible way to pick a winner here — so the ambiguity is
     refused at load time rather than resolved arbitrarily in production.
+
+    The rule keys on locale and folded surface form, which is why it needs no
+    change now that several entries may share a target: it already refuses both
+    bad cases. Two entries with *different* metadata claiming one word leaves
+    which filter applies unanswerable; two with the same target and the same
+    metadata is a redundant declaration. What did change is the wording — with
+    two entries resolving to one entity, naming only the entity says nothing
+    about which pair collided.
     """
-    claimed: dict[tuple[str, str], tuple[str, str]] = {}
-    for canonical_id, locales in entities.items():
-        for locale, forms in locales.items():
+    claimed: dict[tuple[str, str], tuple[Entry, str]] = {}
+    for entry in entries.values():
+        for locale, forms in entry.locales.items():
             for field, surface_form in _named_forms(forms):
                 key = (locale, surface_form.casefold())
                 if key in claimed:
                     owner, owner_field = claimed[key]
                     raise _fault(
                         field,
-                        f"claims the surface form {surface_form!r}, which entity "
-                        f"{owner!r} already claims as {owner_field!r} in this "
-                        f"locale; one word cannot resolve to two entities",
-                        canonical_id=canonical_id,
+                        f"claims the surface form {surface_form!r}"
+                        f"{_resolving(entry)}, which {_names(owner)} already "
+                        f"claims as {owner_field!r} in this locale; one word "
+                        f"cannot resolve to two entries",
+                        canonical_id=entry.entry_id,
                         locale=locale,
                     )
-                claimed[key] = (canonical_id, field)
+                claimed[key] = (entry, field)
+
+
+def _names(entry: Entry) -> str:
+    """How an error refers to another entry: its name, and what it resolves to.
+
+    The target is spelled out only when it differs from the entry ID. Repeating
+    the same identifier twice would make every ambiguity error in every lexicon
+    that never uses the feature read as though something more complicated were
+    going on.
+    """
+    if entry.canonical_id == entry.entry_id:
+        return f"entry {entry.entry_id!r}"
+    return f"entry {entry.entry_id!r} (resolving to {entry.canonical_id!r})"
+
+
+def _resolving(entry: Entry) -> str:
+    """The target of the entry a fault is reported against, when it has its own.
+
+    The fault's coordinates already name that entry, so only the entity it means
+    is missing — and only when the two differ.
+    """
+    if entry.canonical_id == entry.entry_id:
+        return ""
+    return f" for {entry.canonical_id!r}"
 
 
 def _named_forms(forms: SurfaceForms) -> list[tuple[str, str]]:

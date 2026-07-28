@@ -203,5 +203,5 @@ def _declared_locales(lexicon: Lexicon) -> tuple[str, ...]:
     first spelling encountered stands in for any later case variant of it.
     """
     return deduplicate(
-        locale for locales in lexicon.entities.values() for locale in locales
+        locale for entry in lexicon.entries.values() for locale in entry.locales
     )

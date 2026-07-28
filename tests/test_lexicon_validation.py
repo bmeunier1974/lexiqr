@@ -112,7 +112,7 @@ def test_a_well_formed_locale_tag_is_accepted_in_the_casing_it_was_authored_in(
 ) -> None:
     lexicon = Lexicon.from_dict(authored_in(tag))
 
-    assert set(lexicon.entities["product"]) == {tag}
+    assert set(lexicon.entries["product"].locales) == {tag}
 
 
 @pytest.mark.parametrize(
@@ -148,7 +148,7 @@ def test_a_surface_form_at_the_maximum_length_is_accepted() -> None:
 
     lexicon = Lexicon.from_dict(with_alternate(longest))
 
-    assert lexicon.entities["product"]["de-DE"].alternates == (longest,)
+    assert lexicon.entries["product"].locales["de-DE"].alternates == (longest,)
 
 
 def test_a_surface_form_one_character_over_the_maximum_is_rejected() -> None:

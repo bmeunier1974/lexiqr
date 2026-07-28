@@ -20,7 +20,7 @@
       "$ref": "#/$defs/locale"
     },
     "entities": {
-      "description": "Entities keyed by canonical ID (e.g. \"product\").",
+      "description": "Entries keyed by entry ID: one named set of surface forms each (e.g. \"product\", or \"movie\" with canonicalId \"product\").",
       "type": "object",
       "minProperties": 1,
       "propertyNames": { "$ref": "#/$defs/canonicalId" },

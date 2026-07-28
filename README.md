@@ -107,7 +107,7 @@ try:
 except ValidationError as invalid:
     print(f"rejected: {invalid}")
 else:
-    print(f"valid: {sorted(lexicon.entities)} in {lexicon.default_locale}")
+    print(f"valid: {sorted(lexicon.entries)} in {lexicon.default_locale}")
 ```
 
 <!-- quickstart:expected -->
