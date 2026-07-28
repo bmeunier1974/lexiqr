@@ -807,6 +807,146 @@ def test_the_run_reads_the_cli_exit_codes_from_their_named_constants() -> None:
         assert name in source, f"the run does not name {name}"
 
 
+# --- The README section. The front page is what a reader meets first, so what it
+# --- shows has to be what the command prints. Prior art is
+# --- test_entry_format_docs.py, which runs the CLI and asserts that every line the
+# --- authoring guide quotes is a line the command actually printed.
+
+
+README = REPO_ROOT / "README.md"
+
+#: The heading of the section that documents the sample run. Named once, because
+#: three tests locate the section by it.
+README_SECTION = "## The whole contract, in one command"
+
+
+def readme_section() -> str:
+    """The README's sample-run section, from its heading to the next one."""
+    text = README.read_text(encoding="utf-8")
+
+    assert README_SECTION in text, f"the README has no {README_SECTION!r} section"
+    return text.split(README_SECTION, 1)[1].split("\n## ", 1)[0]
+
+
+def readme_prose() -> str:
+    """The section with its fenced blocks removed — what the page says in its own voice.
+
+    The excerpt quotes section headings, and those carry capability tags. Looking
+    for a bullet's tag across the whole section would therefore find the tag in
+    the transcript instead, and "the page lists this claim" would pass on a page
+    that stopped listing it.
+    """
+    outside, inside = [], False
+    for line in readme_section().splitlines():
+        if line.startswith("```"):
+            inside = not inside
+        elif not inside:
+            outside.append(line)
+    return "\n".join(outside)
+
+
+def readme_excerpt() -> list[str]:
+    """The non-blank lines of the skip-marked transcript excerpt in that section."""
+    section = readme_section()
+
+    assert "<!-- quickstart:skip -->" in section, (
+        "the excerpt is not marked with the skip directive, so the quickstart "
+        "extractor would try to execute a block of transcript"
+    )
+    fenced = section.split("<!-- quickstart:skip -->", 1)[1]
+    block = fenced.split("```text", 1)[1].split("```", 1)[0]
+    return [line for line in block.splitlines() if line.strip()]
+
+
+def test_the_readme_names_the_command_that_runs_the_whole_contract() -> None:
+    """An OSS contributor should find it without reading the test suite."""
+    section = readme_section()
+
+    assert "uv run python examples/demo.py" in section, (
+        "the README section does not spell the command a reader types"
+    )
+    assert (
+        "examples/demo.py" in section and "examples/medien.lexicon.json" in section
+    ), "the section does not point at the run or at the lexicon it resolves"
+
+
+def test_every_line_the_readme_quotes_is_a_line_the_run_prints() -> None:
+    """The front page cannot show output the command does not produce.
+
+    Every non-blank line of the excerpt is matched against the committed golden,
+    line for line. An excerpt is allowed to *omit* — it says so in prose, and
+    which sections it elides — but it is not allowed to invent.
+    """
+    golden = set(GOLDEN.read_text(encoding="utf-8").splitlines())
+    excerpt = readme_excerpt()
+
+    assert len(excerpt) >= 10, (
+        f"the excerpt is {len(excerpt)} lines, which is too little of the run to be "
+        f"worth showing"
+    )
+    for line in excerpt:
+        assert line in golden, (
+            f"the README quotes a line the run does not print:\n  {line!r}\n"
+            f"If the transcript changed, regenerate it and re-copy the excerpt: "
+            f"{REGENERATE}"
+        )
+
+
+def test_the_readme_section_carries_a_bullet_for_every_capability_the_run_claims() -> (
+    None
+):
+    """A claim cannot be dropped from the page while staying in the run.
+
+    The section is a reader's index of what the command covers. If it stops
+    listing one of the capabilities the transcript demonstrates, the page has
+    quietly become a smaller promise than the command it documents.
+    """
+    listed = set(re.findall(r"C\d+", readme_prose()))
+
+    missing = THE_CAPABILITIES_THE_RUN_CLAIMS - listed
+    assert not missing, (
+        f"the README section does not list {', '.join(sorted(missing))}, which the "
+        f"run demonstrates"
+    )
+
+
+def test_the_readme_section_names_what_the_run_does_not_cover() -> None:
+    """A transcript this long invites being read as the whole guarantee.
+
+    So the three claims it does not make are named, each with the gate that owns
+    it — otherwise a reader could reasonably conclude that a green sample run
+    means lexiqr is fast, cross-platform, and installable.
+    """
+    section = readme_section()
+    excluded = section.lower()
+
+    for claim, gate in (
+        ("performance", "perf"),
+        ("cross-platform", "report_equality"),
+        ("installability", "release workflow"),
+    ):
+        assert claim in excluded, f"the section does not name the {claim} exclusion"
+        assert gate.lower() in excluded, f"the section does not name the {claim} gate"
+
+
+def test_the_readme_quickstart_section_is_untouched_by_the_new_one() -> None:
+    """The five-minute promise stays five minutes.
+
+    The new section sits after the quickstart rather than inside it, so the
+    founding flooff story a reader meets first is exactly as long as it was.
+    """
+    text = README.read_text(encoding="utf-8")
+    quickstart = text.split("## Quickstart", 1)[1].split("\n## ", 1)[0]
+
+    assert "flooff" in quickstart, "the quickstart is no longer the flooff story"
+    assert README_SECTION.lstrip("# ") not in quickstart, (
+        "the deep run has been folded into the quickstart"
+    )
+    assert text.index(README_SECTION) > text.index("## Quickstart"), (
+        "the deep-run section comes before the quickstart"
+    )
+
+
 def test_the_run_records_how_its_golden_is_regenerated() -> None:
     """A golden nobody knows how to rebuild is a golden that gets hand-edited.
 
