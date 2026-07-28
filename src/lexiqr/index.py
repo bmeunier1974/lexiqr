@@ -22,6 +22,7 @@ from collections import deque
 from dataclasses import dataclass, field
 
 from lexiqr.lexicon import Lexicon, SurfaceForms
+from lexiqr.metadata import EMPTY, Metadata
 from lexiqr.normalizer import normalize_text
 from lexiqr.types import ScoreTier
 
@@ -51,6 +52,11 @@ class Hit:
     surface_form: str
     span: tuple[int, int]
     score_tier: ScoreTier
+    #: The entry's filter, carried by reference: `Metadata` is immutable, so every
+    #: hit on a form points at the one object the loader built rather than paying
+    #: for a copy per hit — which is what keeps the performance envelope intact on
+    #: a lexicon whose every entry declares one.
+    metadata: Metadata = EMPTY
 
     @classmethod
     def of(cls, form: SurfaceForm, span: tuple[int, int]) -> Hit:
@@ -67,6 +73,7 @@ class Hit:
             surface_form=form.surface_form,
             span=span,
             score_tier=form.score_tier,
+            metadata=form.metadata,
         )
 
 
@@ -89,6 +96,8 @@ class SurfaceForm:
     #: what it resolved to in the tenant's own spelling.
     surface_form: str
     score_tier: ScoreTier
+    #: The entry's filter; see `Hit.metadata`.
+    metadata: Metadata = EMPTY
 
 
 @dataclass
@@ -152,6 +161,7 @@ class SurfaceFormIndex:
                         entry_id=entry.entry_id,
                         surface_form=surface_form,
                         score_tier=tier,
+                        metadata=entry.metadata,
                     )
                     _insert(root, compiled)
                     forms.append(compiled)

@@ -86,3 +86,30 @@ def test_core_accepts_the_generated_lexicon_without_rejecting_it() -> None:
         EntityResolver.from_dict(lexicon)
     except ValidationError as rejected:  # pragma: no cover - failure detail
         pytest.fail(f"the benchmark lexicon must load cleanly, but: {rejected}")
+
+
+def test_every_entry_of_the_benchmark_lexicon_carries_a_filter() -> None:
+    """The envelope is claimed for a lexicon that uses the feature, not one that
+    ignores it — so the fixture the gate measures has to use it everywhere.
+
+    Without this the perf gate would pass on a lexicon with no metadata at all and
+    the claim "adopting filters costs nothing per request" would be untested.
+    """
+    entities = generate_benchmark_lexicon(seed=BENCHMARK_SEED)["entities"]
+
+    assert entities
+    assert all(entity.get("metadata") for entity in entities.values())
+
+
+def test_the_benchmark_filters_exercise_every_kind_of_value() -> None:
+    """A bag of one string would not exercise holding, hashing, or serializing the
+    list case, which is the one with a per-value cost."""
+    kinds = {
+        type(value)
+        for entity in generate_benchmark_lexicon(seed=BENCHMARK_SEED)[
+            "entities"
+        ].values()
+        for value in entity["metadata"].values()
+    }
+
+    assert {str, int, bool, list} <= kinds

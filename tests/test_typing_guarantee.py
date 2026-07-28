@@ -77,24 +77,36 @@ def describe(match: EntityMatch) -> str:
     start, end = match.span
     tier: ScoreTier | None = match.score_tier
     correction: str | None = match.correction
+    entry_id: str = match.entry_id
     return (
         f"{match.surface_form}[{start}:{end}] -> "
-        f"{match.canonical_id} ({tier}, {correction})"
+        f"{match.canonical_id} via {entry_id} ({tier}, {correction}) "
+        f"{filter_of(match)}"
     )
 
 
-def search_filter(entry: Entry) -> dict[str, list[str]]:
-    """The jargon-to-filter half of the mapping, read out of a held lexicon.
+def filter_of(match: EntityMatch) -> dict[str, list[str]]:
+    """The filter the tenant's own word implied, straight off the match.
 
-    A filter value is a scalar or a set of scalars, so a consuming service that
-    wants every value as a list narrows on the type it was handed.
+    Always a mapping — empty when the entry declared none — so there is no
+    guard here, which is the whole point of it never being absent.
     """
-    metadata: Metadata = entry.metadata
+    return narrow(match.metadata)
+
+
+def narrow(metadata: Metadata) -> dict[str, list[str]]:
+    """A filter value is a scalar or a set of scalars, so a consuming service that
+    wants every value as a list narrows on the type it was handed."""
     narrowed: dict[str, list[str]] = {}
     for key in metadata:
         value: MetadataValue = metadata[key]
         narrowed[key] = list(value) if isinstance(value, tuple) else [str(value)]
     return narrowed
+
+
+def search_filter(entry: Entry) -> dict[str, list[str]]:
+    """The jargon-to-filter half of the mapping, read out of a held lexicon."""
+    return narrow(entry.metadata)
 
 
 def filters_by_entry(lexicon_path: Path) -> dict[str, dict[str, list[str]]]:

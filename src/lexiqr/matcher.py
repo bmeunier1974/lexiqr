@@ -317,9 +317,11 @@ def _to_match(
     start, end = normalized.to_original_span(*claim.hit.span)
     return EntityMatch(
         canonical_id=claim.hit.canonical_id,
+        entry_id=claim.hit.entry_id,
         surface_form=claim.hit.surface_form,
         span=(start, end),
         score_tier=claim.hit.score_tier,
         matched_locale=locale,
         correction=prompt[start:end] if claim.is_fuzzy else None,
+        metadata=claim.hit.metadata,
     )

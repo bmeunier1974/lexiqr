@@ -7,10 +7,12 @@ exists for, asserted the way an integrating developer would meet it: build a
 resolver from a document, resolve a prompt, read the report.
 """
 
+import json
+
 import pytest
 
-from conftest import REPO_ROOT, lexicon_document
-from lexiqr import EntityResolver, ScoreTier
+from conftest import FLOOFF_LEXICON, REPO_ROOT, lexicon_document
+from lexiqr import EntityResolver, MatchReport, ScoreTier
 
 #: The shape as a lexicon author would ship it, so the corpus carries a worked
 #: example and the ADR 0003 equivalence harness covers it: a document using the
@@ -120,3 +122,90 @@ def test_the_published_fixture_resolves_every_entry_to_the_one_entity(
     assert [(m.canonical_id, m.surface_form) for m in report.matches] == [
         ("product", surface_form)
     ]
+
+
+def test_a_match_carries_the_filter_of_the_entry_that_answered() -> None:
+    """The jargon-to-filter half of the mapping, delivered.
+
+    Without this a consuming service knows `product` was named and has to keep its
+    own per-tenant table to learn that this tenant's "filme" meant the Movie kind
+    — which is the table lexiqr exists to remove.
+    """
+    report = EntityResolver.from_file(MEDIEN).transform("wo sind die filme", "de-DE")
+
+    match = report.matches[0]
+    assert (match.canonical_id, match.entry_id) == ("product", "movie")
+    assert dict(match.metadata) == {
+        "productType": "Movie",
+        "genre": ("drama", "thriller"),
+    }
+
+
+def test_a_match_from_an_entry_with_no_filter_carries_an_empty_one() -> None:
+    """Empty, never absent, so consuming code needs no guard — and the entry ID is
+    a real string, equal to the canonical ID, rather than an absence to interpret."""
+    report = EntityResolver.from_file(FLOOFF_LEXICON).transform(
+        "wo ist flooff", "de-DE"
+    )
+
+    match = report.matches[0]
+    assert (match.canonical_id, match.entry_id) == ("product", "product")
+    assert match.metadata == {}
+
+
+def test_a_misspelling_resolves_to_the_same_entry_and_filter_as_the_exact_word() -> (
+    None
+):
+    """Tolerance must never silently drop the filter.
+
+    A fuzzy hit is a hit on a declared form, so it carries what that form's entry
+    carries. Asserted against the exact spelling rather than a literal, so the two
+    paths cannot drift apart.
+    """
+    resolver = EntityResolver.from_file(MEDIEN)
+
+    exact = resolver.transform("wo ist der spielfilm", "de-DE").matches[0]
+    fuzzy = resolver.transform("wo ist der spielfim", "de-DE").matches[0]
+
+    assert fuzzy.correction == "spielfim"
+    assert (fuzzy.entry_id, fuzzy.metadata) == (exact.entry_id, exact.metadata)
+    assert (fuzzy.canonical_id, fuzzy.surface_form) == (
+        exact.canonical_id,
+        exact.surface_form,
+    )
+
+
+def test_the_filter_a_caller_was_handed_cannot_be_mutated() -> None:
+    """Lexicon-derived data reaches a service through a match; a service that could
+    edit it in place would corrupt every later match of the same entry."""
+    match = EntityResolver.from_file(MEDIEN).transform("die filme", "de-DE").matches[0]
+
+    with pytest.raises(TypeError):
+        match.metadata["productType"] = "Series"  # type: ignore[index]
+
+
+def test_a_filter_changes_nothing_about_which_matches_come_back_or_their_order() -> (
+    None
+):
+    """The stated non-goal: metadata is carried, never consulted.
+
+    The same lexicon with every filter stripped must resolve identically in
+    everything but the filters themselves — same matches, same tiers, same order.
+    """
+    declared = json.loads(MEDIEN.read_text(encoding="utf-8"))
+    stripped = json.loads(MEDIEN.read_text(encoding="utf-8"))
+    for entity in stripped["entities"].values():
+        del entity["metadata"]
+
+    prompt = "wo sind die filme und die serien und ein spielfim"
+    with_filters = EntityResolver.from_dict(declared).transform(prompt, "de-DE")
+    without = EntityResolver.from_dict(stripped).transform(prompt, "de-DE")
+
+    def observable(report: MatchReport) -> list[tuple[str, str, tuple[int, int], str]]:
+        return [
+            (m.canonical_id, m.entry_id, m.span, m.score_tier.value)
+            for m in report.matches
+        ]
+
+    assert observable(with_filters) == observable(without)
+    assert [dict(m.metadata) for m in without.matches] == [{}, {}, {}]

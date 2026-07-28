@@ -18,6 +18,7 @@ from lexiqr.cli._report import render_match_report
 def match(
     *,
     canonical_id: str = "product",
+    entry_id: str | None = None,
     surface_form: str = "flooff",
     span: tuple[int, int] = (7, 13),
     score_tier: ScoreTier = ScoreTier.PREFERRED,
@@ -26,6 +27,7 @@ def match(
 ) -> EntityMatch:
     return EntityMatch(
         canonical_id=canonical_id,
+        entry_id=canonical_id if entry_id is None else entry_id,
         surface_form=surface_form,
         span=span,
         score_tier=score_tier,

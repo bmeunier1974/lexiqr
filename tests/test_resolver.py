@@ -92,6 +92,7 @@ def test_an_entity_match_carries_the_full_field_set_with_correction_deferred() -
 
     match = EntityMatch(
         canonical_id="product",
+        entry_id="product",
         surface_form="flooff",
         span=(8, 14),
         score_tier=ScoreTier.PREFERRED,
@@ -101,3 +102,6 @@ def test_an_entity_match_carries_the_full_field_set_with_correction_deferred() -
     assert match.score_tier is ScoreTier.PREFERRED
     assert match.matched_locale == "de-DE"
     assert match.correction is None
+    # Absent is empty, and the entry is a real string rather than an absence.
+    assert match.metadata == {}
+    assert match.entry_id == "product"
