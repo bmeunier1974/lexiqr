@@ -42,7 +42,7 @@ prompt    "wo ist die rechnung"
 locale    de-DE
 matches   1
 match     invoice ← "rechnung"  span=(11, 19)  tier=preferred  locale=de-DE
-sliced    prompt[11:19] == "rechnung"
+typed     prompt[11:19] == "rechnung"
 held      the span indexes the prompt as typed, so slicing the original text by it gives
           back exactly the surface form the match reports — no second search, no
           normalized copy to reconcile.
@@ -112,5 +112,27 @@ held      a variant the lexicon never declares is answered by a sibling or by th
           default; a variant it does author answers its own prompts and falls through
           only for the forms it does not declare. Either way the report says which
           locale it was.
+
+--- 8. Accents fold, spans stay on the typed text, and Arabic keeps its script [C7] ---
+
+claim     Normalization is decided per script. In a Latin-script locale a diacritic is a
+          spelling variant a user may reasonably omit, so accents are folded and both
+          spellings resolve to the one declared form — while the span keeps indexing the
+          prompt as typed. Arabic is matched script-preserving: casefolded, and
+          otherwise left exactly as written.
+de-DE     "wo ist die übertragung" → broadcast ← "übertragung"  span=(11, 22)
+          tier=preferred  locale=de-DE
+typed     prompt[11:22] == "übertragung"
+de-DE     "wo ist die ubertragung" → broadcast ← "übertragung"  span=(11, 22)
+          tier=preferred  locale=de-DE
+typed     prompt[11:22] == "ubertragung"
+ar-EG     "أين أفلام" → product ← "أفلام"  span=(4, 9)  tier=preferred  locale=ar-EG
+          entry=movie  filter={genre=drama|thriller, productType=Movie}
+typed     prompt[4:9] == "أفلام"
+hamza     "أين افلام" → 0 matches — the same word with a bare alef in place of its
+          hamza. In Arabic that is a different letter, not a mark to discard.
+held      one declared form matched by two Latin spellings, and every span points at the
+          characters the user typed rather than at a folded copy of them. Arabic is not
+          folded to ASCII, so its script survives the round trip.
 
 OK: every section held.

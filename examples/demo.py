@@ -156,6 +156,17 @@ def render_filter_value(value: MetadataValue) -> str:
     return str(value)
 
 
+def slice_of(prompt: str, match: EntityMatch) -> str:
+    """The original prompt sliced by a match's span, written as the slice itself.
+
+    Printed the way a caller would write it, because that is the point being
+    demonstrated: the offsets index the text the user typed, not a folded copy of
+    it, so no second search is needed to find what a match refers to.
+    """
+    start, end = match.span
+    return f'prompt[{start}:{end}] == "{prompt[start:end]}"'
+
+
 def heading(number: int, title: str) -> None:
     """The numbered rule that opens a section."""
     print()
@@ -317,7 +328,7 @@ def an_exact_match_reports_entity_form_span_and_tier() -> None:
     emit("locale", report.locale)
     emit("matches", str(len(report.matches)))
     emit("match", render_match(match))
-    emit("sliced", f'prompt[{start}:{end}] == "{prompt[start:end]}"')
+    emit("typed", slice_of(prompt, match))
     emit(
         "held",
         "the span indexes the prompt as typed, so slicing the original text by it "
@@ -488,7 +499,7 @@ def a_typo_carries_its_correction_and_fuzzy_off_does_not() -> None:
     )
     emit("prompt", f'"{A_PROMPT_WITH_A_TYPO}"')
     emit("tolerant", render_match(match))
-    emit("typed", f'prompt[{start}:{end}] == "{A_PROMPT_WITH_A_TYPO[start:end]}"')
+    emit("typed", slice_of(A_PROMPT_WITH_A_TYPO, match))
     emit(
         "exact",
         f"EntityResolver.from_file(..., fuzzy=False) → "
@@ -601,6 +612,90 @@ def an_undeclared_locale_variant_walks_the_fallback_chain() -> None:
     )
 
 
+#: One declared de-DE form, spelled the way the lexicon writes it and the way a
+#: user in a hurry writes it. Both must match, and each span must point at the
+#: prompt it came from — the accented one is a character longer in bytes but not
+#: in code points, which is exactly the kind of thing an off-by-one hides in.
+TWO_SPELLINGS_OF_ONE_LATIN_FORM = (
+    "wo ist die übertragung",
+    "wo ist die ubertragung",
+)
+
+#: An Arabic prompt naming the declared plural, and the same prompt with that
+#: form's hamza replaced by a bare alef. In Arabic that is a different letter, not
+#: a mark to discard, so the second must *not* match.
+AN_ARABIC_PROMPT = "أين أفلام"
+THE_SAME_ARABIC_WITHOUT_ITS_HAMZA = "أين افلام"
+
+
+def normalization_folds_accents_and_preserves_arabic() -> None:
+    """Accents fold, spans stay on the typed text, and Arabic keeps its script [C7]
+
+    The normalization policy, shown rather than described. Folding changes the
+    text and does not change it evenly, so the interesting claim is not that both
+    spellings match — it is that the offsets still index what the user typed.
+    """
+    resolver = EntityResolver.from_file(LEXICON)
+
+    emit(
+        "claim",
+        "Normalization is decided per script. In a Latin-script locale a diacritic "
+        "is a spelling variant a user may reasonably omit, so accents are folded "
+        "and both spellings resolve to the one declared form — while the span keeps "
+        "indexing the prompt as typed. Arabic is matched script-preserving: "
+        "casefolded, and otherwise left exactly as written.",
+    )
+
+    latin = []
+    for prompt in TWO_SPELLINGS_OF_ONE_LATIN_FORM:
+        match = resolver.transform(prompt, "de-DE").matches[0]
+        latin.append((prompt, match))
+        emit("de-DE", f'"{prompt}" → {render_match(match)}')
+        emit("typed", slice_of(prompt, match))
+
+    arabic = resolver.transform(AN_ARABIC_PROMPT, "ar-EG").matches[0]
+    stripped = resolver.transform(THE_SAME_ARABIC_WITHOUT_ITS_HAMZA, "ar-EG")
+
+    emit("ar-EG", f'"{AN_ARABIC_PROMPT}" → {render_match(arabic)}')
+    emit("typed", slice_of(AN_ARABIC_PROMPT, arabic))
+    emit(
+        "hamza",
+        f'"{THE_SAME_ARABIC_WITHOUT_ITS_HAMZA}" → {len(stripped.matches)} matches — '
+        f"the same word with a bare alef in place of its hamza. In Arabic that is "
+        f"a different letter, not a mark to discard.",
+    )
+    emit(
+        "held",
+        "one declared form matched by two Latin spellings, and every span points "
+        "at the characters the user typed rather than at a folded copy of them. "
+        "Arabic is not folded to ASCII, so its script survives the round trip.",
+    )
+
+    assert len({match.surface_form for _, match in latin}) == 1, (
+        f"the two spellings resolved to different declared forms "
+        f"{[match.surface_form for _, match in latin]}, so nothing was folded"
+    )
+    typed = [prompt[match.span[0] : match.span[1]] for prompt, match in latin]
+    assert len(set(typed)) == len(typed), (
+        f"both spans slice out {typed[0]!r}, so one of the two prompts is not the "
+        f"spelling this section says it is"
+    )
+    assert any(text == latin[0][1].surface_form for text in typed), (
+        f"neither span slices back the declared form {latin[0][1].surface_form!r}, "
+        f"so the accented spelling is not the one the lexicon holds"
+    )
+
+    start, end = arabic.span
+    assert AN_ARABIC_PROMPT[start:end] == arabic.surface_form, (
+        f"the Arabic span points at {AN_ARABIC_PROMPT[start:end]!r} while the match "
+        f"reports {arabic.surface_form!r}"
+    )
+    assert not stripped.matches, (
+        f"the Arabic form resolved with its hamza stripped, so matching is folding "
+        f"a letter it must preserve: {stripped.matches}"
+    )
+
+
 # --- The driver --------------------------------------------------------------
 
 
@@ -628,6 +723,7 @@ SECTIONS: tuple[Section, ...] = (
     two_entries_resolve_to_one_entity_with_their_own_filters,
     a_typo_carries_its_correction_and_fuzzy_off_does_not,
     an_undeclared_locale_variant_walks_the_fallback_chain,
+    normalization_folds_accents_and_preserves_arabic,
 )
 
 

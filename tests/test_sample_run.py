@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import ast
 import json
+import os
 import subprocess
 import sys
 from dataclasses import replace
@@ -472,6 +473,85 @@ def test_the_transcript_names_the_locale_that_answered_each_request() -> None:
     )
     assert ", ".join(walked) in printed, (
         f"the section does not name which locale answered each request: {walked}"
+    )
+
+
+def test_the_transcript_keeps_every_span_on_the_text_as_typed() -> None:
+    """Section 8's claim, and the only way to demonstrate it.
+
+    Matching folds a Latin diacritic; the span must not. So both spellings are
+    resolved here and each span is sliced out of the prompt it came from — the
+    accented prompt must give the accent back, the plain one must not. A span
+    computed against the folded text would be off by one from the accent onward
+    and this would catch it.
+    """
+    resolver = EntityResolver.from_file(LEXICON)
+    printed = transcript_of("normalization_folds_accents_and_preserves_arabic")
+
+    forms = set()
+    for prompt in demo.TWO_SPELLINGS_OF_ONE_LATIN_FORM:
+        match = resolver.transform(prompt, "de-DE").matches[0]
+        start, end = match.span
+        forms.add(match.surface_form)
+        assert f'prompt[{start}:{end}] == "{prompt[start:end]}"' in printed, (
+            f"the section does not show {prompt!r} sliced by its own span"
+        )
+
+    assert len(forms) == 1, (
+        f"the two spellings resolved to different declared forms {forms}, so the "
+        f"section is not showing one form matched two ways"
+    )
+    assert len(set(demo.TWO_SPELLINGS_OF_ONE_LATIN_FORM)) == 2, (
+        "the two prompts are the same string, so no accent is being folded"
+    )
+
+
+def test_the_transcript_matches_arabic_with_its_script_intact() -> None:
+    """Script-preserving means a hamza is a letter, not a mark to discard.
+
+    Both halves are resolved here: the form as written matches, and the same form
+    with its hamza replaced by a bare alef does not. A normalization policy that
+    stripped everything to ASCII would resolve both, and the section would be
+    claiming a policy lexiqr does not have.
+    """
+    resolver = EntityResolver.from_file(LEXICON)
+    printed = transcript_of("normalization_folds_accents_and_preserves_arabic")
+
+    as_written = resolver.transform(demo.AN_ARABIC_PROMPT, "ar-EG")
+    stripped = resolver.transform(demo.THE_SAME_ARABIC_WITHOUT_ITS_HAMZA, "ar-EG")
+
+    assert len(as_written.matches) == 1, "the Arabic prompt no longer resolves"
+    assert not stripped.matches, (
+        f"Arabic resolved with its hamza stripped, so matching is not "
+        f"script-preserving: {stripped.matches}"
+    )
+    assert collapsed(demo.render_match(as_written.matches[0])) in printed, (
+        "the section does not show the Arabic match the resolver produces"
+    )
+    assert as_written.matches[0].surface_form in printed, (
+        "the Arabic surface form does not appear in the transcript with its script"
+    )
+
+
+def test_the_run_survives_a_default_stdout_encoding_that_cannot_hold_arabic() -> None:
+    """The reason the driver reconfigures stdout, watched rather than asserted in prose.
+
+    A developer on a Windows console meets a code page that cannot encode Arabic,
+    and would get a `UnicodeEncodeError` instead of a transcript. Forcing an
+    ASCII default here reproduces that without needing Windows. The
+    reconfiguration is inside the driver — the import-safety test is what keeps it
+    from drifting up to module level.
+    """
+    result = subprocess.run(
+        [sys.executable, str(RUN)],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        env={**os.environ, "PYTHONIOENCODING": "ascii"},
+    )
+
+    assert result.returncode == 0, result.stderr.decode("utf-8", "replace")
+    assert demo.AN_ARABIC_PROMPT.encode("utf-8") in result.stdout, (
+        "the run exited zero but its Arabic did not reach stdout"
     )
 
 
