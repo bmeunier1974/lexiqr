@@ -93,4 +93,24 @@ held      the same prompt resolves with tolerance on and resolves to nothing wit
           off. A reader can see what the fuzzy pass is doing, and what turning it off
           costs them, rather than taking either on faith.
 
+--- 7. An undeclared locale variant resolves, and the report names what answered [C6] ---
+
+claim     A caller states the locale and lexiqr never guesses it. When the requested
+          locale produces no match, resolution walks a chain — the exact locale, then
+          that language's other variants in tag order, then the declared default — and
+          stops at the first locale that answers. The report names that locale.
+declared  ar-EG, de-AT, de-DE, en-GB — default de-DE, with de-AT authored on one entry
+          only
+de-CH     "wo ist der film" → product ← "film"  span=(11, 15)  tier=preferred
+          locale=de-DE  entry=movie  filter={genre=drama|thriller, productType=Movie}
+de-AT     "wo ist die faktura" → invoice ← "faktura"  span=(11, 18)  tier=preferred
+          locale=de-AT
+de-AT     "wo ist die rechnung" → invoice ← "rechnung"  span=(11, 19)  tier=preferred
+          locale=de-DE
+answered  de-CH → de-DE, de-AT → de-AT, de-AT → de-DE
+held      a variant the lexicon never declares is answered by a sibling or by the
+          default; a variant it does author answers its own prompts and falls through
+          only for the forms it does not declare. Either way the report says which
+          locale it was.
+
 OK: every section held.

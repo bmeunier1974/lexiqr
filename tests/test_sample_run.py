@@ -443,6 +443,38 @@ def test_the_transcript_shows_both_halves_of_typo_tolerance() -> None:
     )
 
 
+def test_the_transcript_names_the_locale_that_answered_each_request() -> None:
+    """Section 7's summary line, resolved here rather than read off the golden.
+
+    The cases come from the run, so the test cannot drift out of step with what
+    the section sends, and each locale is resolved against the real fallback
+    policy. A change that made every request answer in its own locale — or in the
+    default regardless — fails here rather than being absorbed by a regenerated
+    transcript.
+    """
+    resolver = EntityResolver.from_file(LEXICON)
+    printed = transcript_of("an_undeclared_locale_variant_walks_the_fallback_chain")
+
+    walked = []
+    for requested, prompt, expected in demo.THREE_LOCALE_REQUESTS:
+        report = resolver.transform(prompt, requested)
+        assert report.locale == expected, (
+            f"{prompt!r} requested in {requested} was answered by {report.locale}, "
+            f"not {expected}"
+        )
+        walked.append(f"{requested} → {report.locale}")
+
+    assert any(
+        requested != answered for requested, _, answered in demo.THREE_LOCALE_REQUESTS
+    ), (
+        "every request was answered in its own locale, so the section shows no "
+        "fallback at all"
+    )
+    assert ", ".join(walked) in printed, (
+        f"the section does not name which locale answered each request: {walked}"
+    )
+
+
 def test_the_run_records_how_its_golden_is_regenerated() -> None:
     """A golden nobody knows how to rebuild is a golden that gets hand-edited.
 

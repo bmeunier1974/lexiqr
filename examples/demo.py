@@ -521,6 +521,86 @@ def a_typo_carries_its_correction_and_fuzzy_off_does_not() -> None:
     )
 
 
+#: Three requests, and the locale each one is answered by. `de-CH` is a variant
+#: the lexicon never declares; `de-AT` is one it declares on a single entry, so
+#: the same requested locale answers its own prompt for the form it authors and
+#: falls through to the default for the form it does not.
+THREE_LOCALE_REQUESTS = (
+    ("de-CH", "wo ist der film", "de-DE"),
+    ("de-AT", "wo ist die faktura", "de-AT"),
+    ("de-AT", "wo ist die rechnung", "de-DE"),
+)
+
+
+def an_undeclared_locale_variant_walks_the_fallback_chain() -> None:
+    """An undeclared locale variant resolves, and the report names what answered [C6]
+
+    What happens when a caller's users request `de-AT` and the tenant authored
+    `de-DE`. The answer has to be traceable, not merely successful.
+    """
+    lexicon = Lexicon.from_file(LEXICON)
+    resolver = EntityResolver(lexicon)
+    declared = sorted(
+        {locale for entry in lexicon.entries.values() for locale in entry.locales}
+    )
+
+    emit(
+        "claim",
+        "A caller states the locale and lexiqr never guesses it. When the "
+        "requested locale produces no match, resolution walks a chain — the exact "
+        "locale, then that language's other variants in tag order, then the "
+        "declared default — and stops at the first locale that answers. The "
+        "report names that locale.",
+    )
+    emit(
+        "declared",
+        f"{', '.join(declared)} — default {lexicon.default_locale}, with de-AT "
+        f"authored on one entry only",
+    )
+
+    walked = []
+    for requested, prompt, _ in THREE_LOCALE_REQUESTS:
+        report = resolver.transform(prompt, requested)
+        walked.append((requested, prompt, report))
+        emit(requested, f'"{prompt}" → {render_match(report.matches[0])}')
+
+    emit(
+        "answered",
+        ", ".join(f"{requested} → {report.locale}" for requested, _, report in walked),
+    )
+    emit(
+        "held",
+        "a variant the lexicon never declares is answered by a sibling or by the "
+        "default; a variant it does author answers its own prompts and falls "
+        "through only for the forms it does not declare. Either way the report "
+        "says which locale it was.",
+    )
+
+    for (requested, prompt, report), (_, _, expected) in zip(
+        walked, THREE_LOCALE_REQUESTS, strict=True
+    ):
+        assert len(report.matches) == 1, (
+            f"{prompt!r} in {requested} was meant to resolve and gave {report.matches}"
+        )
+        assert report.locale == expected, (
+            f"{prompt!r} requested in {requested} was answered by "
+            f"{report.locale}, not {expected}"
+        )
+        assert report.matches[0].matched_locale == report.locale, (
+            "the match names a different locale than the report it sits in"
+        )
+
+    answered = {(requested, report.locale) for requested, _, report in walked}
+    assert any(requested != locale for requested, locale in answered), (
+        "every request was answered in the locale it asked for, so nothing here "
+        "demonstrates a fallback chain"
+    )
+    assert any(requested == locale for requested, locale in answered), (
+        "no request was answered by the locale it asked for, so the chain's "
+        "stopping point at the more specific locale is not visible"
+    )
+
+
 # --- The driver --------------------------------------------------------------
 
 
@@ -547,6 +627,7 @@ SECTIONS: tuple[Section, ...] = (
     every_score_tier_resolves_and_names_itself,
     two_entries_resolve_to_one_entity_with_their_own_filters,
     a_typo_carries_its_correction_and_fuzzy_off_does_not,
+    an_undeclared_locale_variant_walks_the_fallback_chain,
 )
 
 
