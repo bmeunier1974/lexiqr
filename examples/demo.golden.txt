@@ -61,4 +61,21 @@ canonical "wo sind die series" → product ← "series"  span=(12, 18)  tier=can
 held      all three tiers were observed, each one named by the match that came back
           rather than inferred from which prompt was sent.
 
+--- 5. Two entries resolve to one entity, each with its own filter [C19] ---
+
+claim     Several entries may resolve to one entity. Every match names the entity a
+          backend queries, the entry that answered, and that entry's filter — carried
+          verbatim and never interpreted — so a service builds its query from the match
+          report instead of keeping a per-tenant table of its own.
+match     "zeig mir die filme" → product ← "filme"  span=(13, 18)  tier=preferred
+          locale=de-DE  entry=movie  filter={genre=drama|thriller, productType=Movie}
+match     "zeig mir die serien" → product ← "serien"  span=(13, 19)  tier=preferred
+          locale=de-DE  entry=series  filter={episodic=true, productType=Series}
+spelling  the boolean filter value reads `episodic=true` — the spelling the lexicon file
+          uses, not Python's `True`. A reader is here to learn what their own document
+          says.
+held      both matches name one entity, and each names its own entry and its own filter.
+          The entry is a field of its own, so a service knows which of the two to key
+          on; the filter is the tenant's own words, so it can go straight into a query.
+
 OK: every section held.

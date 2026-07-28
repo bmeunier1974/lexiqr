@@ -356,6 +356,65 @@ def test_the_transcript_shows_a_match_in_every_score_tier() -> None:
     )
 
 
+def test_the_transcript_names_the_entry_and_the_filter_that_answered() -> None:
+    """Section 5's two facts, pinned by name: the entry line and the filter line.
+
+    These are the two the epic exists for. The entry has to be legible as a field
+    of its own — an integrating developer decides which of entity and entry to
+    key on by reading exactly this — and the filter has to appear verbatim,
+    because a service pastes it into a query.
+    """
+    resolver = EntityResolver.from_file(LEXICON)
+    printed = transcript_of("two_entries_resolve_to_one_entity_with_their_own_filters")
+
+    answered = [
+        resolver.transform(prompt, "de-DE").matches[0]
+        for prompt in demo.TWO_PROMPTS_FOR_ONE_ENTITY
+    ]
+
+    assert {match.canonical_id for match in answered} == {"product"}, (
+        f"the section's prompts no longer both answer product: {answered}"
+    )
+    for match in answered:
+        assert f"entry={match.entry_id}" in printed, (
+            f"the section does not name the entry that answered: {match.entry_id}"
+        )
+        assert f"filter={{{demo.render_filter(match.metadata)}}}" in printed, (
+            f"the section does not carry {match.entry_id}'s filter: {match.metadata}"
+        )
+
+
+def test_the_transcript_spells_a_boolean_filter_the_way_the_lexicon_does() -> None:
+    """`true`, not `True`, and read off the lexicon file rather than assumed.
+
+    The document is parsed here to find a boolean an entry really declares, so
+    this cannot pass by testing a spelling nothing in the corpus uses. An author
+    reading `True` has to stop and work out whether they are looking at their own
+    file or at Python's rendering of it, which is the whole trust this section
+    is meant to build.
+    """
+    declared = json.loads(LEXICON.read_text(encoding="utf-8"))["entities"]
+    booleans = {
+        key: value
+        for entry in declared.values()
+        for key, value in entry.get("metadata", {}).items()
+        if isinstance(value, bool)
+    }
+    printed = transcript_of("two_entries_resolve_to_one_entity_with_their_own_filters")
+
+    assert booleans, (
+        "no entry in the example lexicon declares a boolean filter value, so this "
+        "section cannot show the spelling it claims to"
+    )
+    for key, value in booleans.items():
+        assert f"{key}={str(value).lower()}" in printed, (
+            f"the section does not render {key} as JSON spells it: {value!r}"
+        )
+        assert f"{key}={value}" not in printed, (
+            f"the section renders {key} with Python's spelling, {value!r}"
+        )
+
+
 def test_the_run_records_how_its_golden_is_regenerated() -> None:
     """A golden nobody knows how to rebuild is a golden that gets hand-edited.
 

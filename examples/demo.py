@@ -389,6 +389,75 @@ def every_score_tier_resolves_and_names_itself() -> None:
         )
 
 
+#: Two things this tenant's users say, which their backend stores as one entity.
+#: "movie" and "series" are two *entries* resolving to `product`; what tells them
+#: apart is the filter each carries.
+TWO_PROMPTS_FOR_ONE_ENTITY = ("zeig mir die filme", "zeig mir die serien")
+
+
+def two_entries_resolve_to_one_entity_with_their_own_filters() -> None:
+    """Two entries resolve to one entity, each with its own filter [C19]
+
+    The reason a tenant's five words for one database concept stop needing a
+    lookup table in the integrating developer's own service.
+    """
+    resolver = EntityResolver.from_file(LEXICON)
+
+    emit(
+        "claim",
+        "Several entries may resolve to one entity. Every match names the entity "
+        "a backend queries, the entry that answered, and that entry's filter — "
+        "carried verbatim and never interpreted — so a service builds its query "
+        "from the match report instead of keeping a per-tenant table of its own.",
+    )
+
+    answered = []
+    for prompt in TWO_PROMPTS_FOR_ONE_ENTITY:
+        match = resolver.transform(prompt, "de-DE").matches[0]
+        answered.append(match)
+        emit("match", f'"{prompt}" → {render_match(match)}')
+
+    emit(
+        "spelling",
+        "the boolean filter value reads `episodic=true` — the spelling the lexicon "
+        "file uses, not Python's `True`. A reader is here to learn what their own "
+        "document says.",
+    )
+    emit(
+        "held",
+        "both matches name one entity, and each names its own entry and its own "
+        "filter. The entry is a field of its own, so a service knows which of the "
+        "two to key on; the filter is the tenant's own words, so it can go "
+        "straight into a query.",
+    )
+
+    entities = {match.canonical_id for match in answered}
+    assert entities == {"product"}, (
+        f"both prompts were meant to answer one entity and answered {entities}"
+    )
+    assert len({match.entry_id for match in answered}) == len(answered), (
+        "the two matches came back under one entry ID, so nothing distinguishes "
+        "them and the section shows nothing"
+    )
+    assert len({match.metadata for match in answered}) == len(answered), (
+        "the two entries carry the same filter, so a service could not tell which "
+        "of them a match meant"
+    )
+
+    values = [value for match in answered for value in match.metadata.values()]
+    assert any(isinstance(value, tuple) for value in values), (
+        "no entry carries a multi-valued key, so the section cannot show one"
+    )
+    assert any(isinstance(value, bool) for value in values), (
+        "no entry carries a boolean, so the section cannot show its spelling"
+    )
+    rendered = " ".join(render_filter(match.metadata) for match in answered)
+    assert "=true" in rendered and "=True" not in rendered, (
+        f"a boolean filter value is not rendered the way the lexicon spells it: "
+        f"{rendered}"
+    )
+
+
 # --- The driver --------------------------------------------------------------
 
 
@@ -413,6 +482,7 @@ SECTIONS: tuple[Section, ...] = (
     a_rejected_lexicon_names_the_entry_locale_and_field,
     an_exact_match_reports_entity_form_span_and_tier,
     every_score_tier_resolves_and_names_itself,
+    two_entries_resolve_to_one_entity_with_their_own_filters,
 )
 
 
