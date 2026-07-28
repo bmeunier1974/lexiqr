@@ -69,9 +69,17 @@ def test_the_metadata_is_release_quality(wheel: Path) -> None:
     assert metadata.get("Summary")
     assert metadata.get("Description-Content-Type") == "text/markdown"
     assert metadata.get_payload(), "the README ships as the long description"
-    assert metadata.get("License") or any(
-        c.startswith("License ::") for c in (metadata.get_all("Classifier") or [])
+    # PEP 639: the SPDX expression is the modern spelling; the legacy `License`
+    # field and `License ::` classifier remain acceptable so this test states
+    # "the license is in the metadata", not which metadata version carries it.
+    assert (
+        metadata.get("License-Expression")
+        or metadata.get("License")
+        or any(
+            c.startswith("License ::") for c in (metadata.get_all("Classifier") or [])
+        )
     )
+    assert metadata.get_all("License-File"), "the license text ships in the wheel"
     assert metadata.get("Requires-Python")
 
     project_urls = metadata.get_all("Project-URL") or []

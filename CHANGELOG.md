@@ -70,6 +70,15 @@ ships; until then the top released entry below stays 1.0.0.
   is an entity, not another entry), and a metadata value may not be only
   whitespace — it would become a live filter that silently narrows every query.
 
+- **A full sample run demonstrates the whole contract in one command** —
+  `uv run python examples/demo.py` resolves a realistic tenant lexicon
+  (`examples/medien.lexicon.json`, new) and prints twelve narrated sections,
+  each stating a claim, showing what lexiqr produced, and asserting it; a false
+  claim exits non-zero naming the section that broke. Its full output is a
+  committed golden the test suite compares against, the README documents the
+  command with a verified excerpt, and the release workflow runs it against the
+  freshly published wheel — so a publish is verified by twelve claims, not one.
+
 ### Changed
 
 - **The published JSON Schema is amended in place** and republished at the pending
@@ -78,6 +87,12 @@ ships; until then the top released entry below stays 1.0.0.
   had. `RELEASING.md` now documents the republication procedure and names the test
   that enforces it. There is deliberately **no second schema version** — justified
   by the pre-publication window and nothing else (ADR 0005).
+- **Package metadata modernized to PEP 639** — the license is declared as an
+  SPDX expression (`License-Expression: MIT`, Metadata-Version 2.4) with the
+  LICENSE file shipped in the wheel's `dist-info/licenses/`; the deprecated
+  `License ::` classifier is dropped, `Operating System` and `Topic` classifiers
+  and a `Documentation` project URL are added. No change to the code or to the
+  license itself.
 
 ### Breaking
 
