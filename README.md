@@ -72,7 +72,9 @@ resolver = EntityResolver.from_file("lexicon.json")
 
 # "flooff" resolves to the product entity, with its character span and tier.
 match = resolver.transform("wo ist flooff", locale="de-DE").matches[0]
-print(f"{match.canonical_id} <- {match.surface_form!r} at {match.span}, tier {match.score_tier.value}")
+print(
+    f"{match.canonical_id} <- {match.surface_form!r} at {match.span}, tier {match.score_tier.value}"
+)
 
 # The typo "floof" still resolves; the match names what was typed.
 typo = resolver.transform("wo ist floof", locale="de-DE").matches[0]
