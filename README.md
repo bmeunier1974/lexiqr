@@ -1,18 +1,46 @@
 # lexiqr
 
 [![CI](https://github.com/bmeunier1974/lexiqr/actions/workflows/ci.yml/badge.svg)](https://github.com/bmeunier1974/lexiqr/actions/workflows/ci.yml)
+[![Python versions](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-3776AB?logo=python&logoColor=white)](https://github.com/bmeunier1974/lexiqr/blob/main/pyproject.toml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Typing: strict](https://img.shields.io/badge/mypy-strict-blue)](https://mypy-lang.org/)
+[![Linted with Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![Built with uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
+<!-- After the first PyPI release, add the dynamic badges:
+[![PyPI](https://img.shields.io/pypi/v/lexiqr)](https://pypi.org/project/lexiqr/)
+[![PyPI - Python versions](https://img.shields.io/pypi/pyversions/lexiqr)](https://pypi.org/project/lexiqr/)
+and drop the static Python-versions badge above. -->
 
 **lexiqr** is a deterministic Python library for B2B SaaS backend teams whose tenants each speak their own private language. A tenant defines a multilingual lexicon mapping their company jargon ("flooff") to canonical database entities ("product"); lexiqr initializes from that lexicon and transforms free-form prompts into entity-identified prompt objects — exact and typo-tolerant matches with character spans, scores, and corrections.
 
 Where teams today hardcode synonym tables, retrain embeddings, or let an LLM guess, lexiqr is a pip-installable resolution layer that is **deterministic, explainable, and tenant-scoped**.
 
-## Quickstart
+## Highlights
 
-Install it:
+- **Deterministic by contract** — the same lexicon, prompt, and configuration produce an identical result across runs, platforms, and Pythons; a tested guarantee, not an aspiration.
+- **Typo-tolerant, explainably** — length-aware edit budgets, and every fuzzy match carries the correction it applied; turn the pass off entirely with `fuzzy=False`.
+- **Multilingual** — per-locale surface forms, locale fallback chains, accent-insensitive matching for Latin scripts, script-preserving matching for Arabic.
+- **Spans you can trust** — character offsets always index the text the user typed, never a normalized copy.
+- **Entries with metadata** — several terms resolve to one entity, each carrying a tenant-defined filter verbatim, so a match report replaces the per-tenant lookup table in your service.
+- **Typed, tested, bounded** — `py.typed` and strict-mypy clean; a canonical, round-tripping report serialization; documented input limits; a CI-enforced performance envelope.
+- **A CLI for lexicon authors** — `lexiqr validate` and `lexiqr try` work without writing Python, with exit codes a script can branch on.
+
+## Installation
+
+Requires **Python 3.10+**. The wheel is pure Python with a single runtime
+dependency ([RapidFuzz](https://github.com/rapidfuzz/RapidFuzz)):
 
 ```bash
 pip install lexiqr
 ```
+
+or, with [uv](https://docs.astral.sh/uv/):
+
+```bash
+uv add lexiqr
+```
+
+## Quickstart
 
 A lexicon maps one tenant's private jargon to canonical entities. Here a German
 tenant maps **flooff** to the `product` entity — this is the file the examples
@@ -155,7 +183,12 @@ exact     EntityResolver.from_file(..., fuzzy=False) → 0 matches, resolved via
 OK: every section held.
 ```
 
-## Validating a lexicon on its own
+## Usage
+
+The quickstart resolves one word. These are the pieces an integrating developer
+reaches for next, in the order they usually come up.
+
+### Validating a lexicon on its own
 
 Validation *is* construction: `Lexicon.from_file` (and `from_dict`) either returns
 a lexicon lexiqr can trust or raises `ValidationError` naming the entity, locale,
@@ -189,7 +222,7 @@ when you need to tell "that file is not a lexicon document" from "that lexicon
 says the wrong thing" — the distinction the `lexiqr` CLI turns into its two exit
 codes.
 
-## Input limits
+### Input limits
 
 `transform()` accepts a prompt of at most **10,000 characters** (Unicode code points), exported as `MAX_PROMPT_LENGTH`. A prompt over that limit raises `ValidationError` — the same structured error every other lexiqr failure raises — before any matching work happens, so a pasted document is rejected cheaply rather than taking a request thread with it. Reject or truncate upstream if your callers can paste arbitrary text.
 
@@ -197,7 +230,7 @@ A single surface form in a lexicon is bounded too: at most **128 characters**, e
 
 Both limits are fixed parts of the contract, not per-call arguments or configuration knobs: two numbers to reason about. Changing either is a semver-visible change.
 
-## Canonical report serialization
+### Canonical report serialization
 
 `serialize_report(report)` turns a `MatchReport` into a **canonical** string — sorted keys, no insignificant whitespace, pure ASCII, and the match list in the report's own order. Two byte-equal serializations mean two equal reports and nothing else, so you can snapshot a result in your test suite, diff two snapshots to see real behaviour change, or store one and compare it to another months later. `deserialize_report(text)` is its inverse: the form round-trips.
 
@@ -209,6 +242,37 @@ snapshot = serialize_report(resolver.transform("wo ist flooff", locale="de-DE"))
 ```
 
 Both functions are public, semver-governed API: the serialized shape can only change on a major release, so a patch or minor upgrade never silently invalidates a stored snapshot.
+
+### Multi-tenant use
+
+lexiqr resolves one tenant's lexicon per resolver, and deliberately ships **no**
+tenant registry — mapping tenants to resolvers is your composition, not lexiqr's,
+so it stays a thin layer you control. The recipe is a cache of resolvers keyed by
+tenant, each built once from that tenant's lexicon:
+
+<!-- quickstart:skip -->
+```python
+# Illustrative recipe — not run in CI. Adapt the loader and cache to your stack.
+from functools import lru_cache
+from pathlib import Path
+
+from lexiqr import EntityResolver, MatchReport
+
+
+@lru_cache(maxsize=None)
+def resolver_for(tenant_id: str) -> EntityResolver:
+    """One resolver per tenant, built once and reused across requests."""
+    lexicon = Path("lexicons") / f"{tenant_id}.lexicon.json"
+    return EntityResolver.from_file(lexicon)
+
+
+def resolve(tenant_id: str, prompt: str, locale: str) -> MatchReport:
+    return resolver_for(tenant_id).transform(prompt, locale)
+```
+
+Because a resolver is built once and then only read, one instance per tenant is
+safe to share across requests; size the cache to your tenant count, or swap
+`lru_cache` for whatever eviction your deployment already uses.
 
 ## Performance envelope
 
@@ -252,38 +316,7 @@ A breaking change to any of these is a major-version change. Everything else —
 internal modules, private helpers, log wording — can change in a patch. Read the
 [CHANGELOG](CHANGELOG.md) before upgrading; every release documents what changed.
 
-## Multi-tenant use
-
-lexiqr resolves one tenant's lexicon per resolver, and deliberately ships **no**
-tenant registry — mapping tenants to resolvers is your composition, not lexiqr's,
-so it stays a thin layer you control. The recipe is a cache of resolvers keyed by
-tenant, each built once from that tenant's lexicon:
-
-<!-- quickstart:skip -->
-```python
-# Illustrative recipe — not run in CI. Adapt the loader and cache to your stack.
-from functools import lru_cache
-from pathlib import Path
-
-from lexiqr import EntityResolver, MatchReport
-
-
-@lru_cache(maxsize=None)
-def resolver_for(tenant_id: str) -> EntityResolver:
-    """One resolver per tenant, built once and reused across requests."""
-    lexicon = Path("lexicons") / f"{tenant_id}.lexicon.json"
-    return EntityResolver.from_file(lexicon)
-
-
-def resolve(tenant_id: str, prompt: str, locale: str) -> MatchReport:
-    return resolver_for(tenant_id).transform(prompt, locale)
-```
-
-Because a resolver is built once and then only read, one instance per tenant is
-safe to share across requests; size the cache to your tenant count, or swap
-`lru_cache` for whatever eviction your deployment already uses.
-
-## This repository
+## Repository layout
 
 This is a single-repo project: it is both the meta-repo (vision and blueprint) and the product repo (all four C4 containers ship from here as one wheel).
 
@@ -294,17 +327,23 @@ This is a single-repo project: it is both the meta-repo (vision and blueprint) a
 | `schema/` | **schema** | The versioned JSON Schema for lexicon files, plus the shared fixture corpus |
 | `.github/workflows/`, `pyproject.toml` | **delivery** | CI gates and tag→PyPI trusted publishing |
 
-Cross-container truth lives at the root:
+## Documentation
+
+Guides for using lexiqr:
+
+- [docs/lexicon-authoring.md](docs/lexicon-authoring.md) — writing and validating a lexicon
+  file, the `lexiqr validate` / `lexiqr try` CLI, and its scriptable exit-code contract
+- [docs/matching-rules.md](docs/matching-rules.md) — normalization, spans, score tiers,
+  overlap resolution and ordering: the behavior determinism makes public
+- [docs/lexicon-semantic-checks.md](docs/lexicon-semantic-checks.md) — the complete list of
+  checks core enforces beyond the published schema, and why
+- [CHANGELOG.md](CHANGELOG.md) — every release, recorded by hand
+
+The project's cross-container truth:
 
 - [VISION.md](VISION.md) — problem, actors, capabilities, non-goals, constraints
 - [CONTEXT.md](CONTEXT.md) — the project glossary
 - [docs/adr/](docs/adr/) — architecture decision records (repo shape, contracts)
-- [docs/lexicon-authoring.md](docs/lexicon-authoring.md) — writing and validating a lexicon
-  file, the `lexiqr validate` / `lexiqr try` CLI, and its scriptable exit-code contract
-- [docs/lexicon-semantic-checks.md](docs/lexicon-semantic-checks.md) — the complete list of
-  checks core enforces beyond the published schema, and why
-- [docs/matching-rules.md](docs/matching-rules.md) — normalization, spans, score tiers,
-  overlap resolution and ordering: the behavior determinism makes public
 
 ## Contributing
 
@@ -316,8 +355,11 @@ uv sync          # creates the venv and installs lexiqr plus its dev tools
 uv run pytest    # the same suite CI runs on every push and pull request
 ```
 
-Release process and the one-time TestPyPI publisher registration live in
-[CONTRIBUTING.md](CONTRIBUTING.md).
+The pull-request gate (lint, strict type-check, tests on every supported
+Python) is described in [CONTRIBUTING.md](CONTRIBUTING.md); the release
+process, including the one-time PyPI trusted-publisher registration, lives in
+[RELEASING.md](RELEASING.md). To report a security issue, see
+[SECURITY.md](SECURITY.md).
 
 ## License
 

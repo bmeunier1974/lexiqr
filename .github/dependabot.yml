@@ -1,0 +1,21 @@
+# Keep the delivery pipeline's own dependencies fresh: the pinned GitHub
+# Actions the workflows run on, and the dev-tool lockfile. Runtime dependencies
+# are a semver range in pyproject.toml (rapidfuzz>=3.0) and are deliberately
+# not pinned, so there is nothing for Dependabot to bump there.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: uv
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      dev-tools:
+        patterns: ["*"]
