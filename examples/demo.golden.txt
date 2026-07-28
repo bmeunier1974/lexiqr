@@ -1,0 +1,222 @@
+lexiqr — a sample run: every claim printed, every claim asserted.
+lexicon: examples/medien.lexicon.json
+
+--- 1. A tenant lexicon loads from a file: validation is construction [C2] ---
+
+claim     Lexicon.from_file either hands back a lexicon lexiqr can trust or raises
+          ValidationError naming where the document is wrong. Validation is
+          construction, so a caller holding a lexicon has nothing left to check.
+lexicon   examples/medien.lexicon.json
+entries   award, broadcast, invoice, movie, series
+entities  award, broadcast, invoice, product
+locales   ar-EG, de-AT, de-DE, en-GB
+default   de-DE
+held      the loader returned rather than raised, and that verdict is the validation.
+          The 5 entries it read resolve to 4 entities, so more than one entry shares an
+          entity, and the declared default is a locale the lexicon really authors.
+
+--- 2. A rejected lexicon names the entry, locale, and field at fault [C3] ---
+
+claim     A document lexiqr refuses is refused with coordinates. ValidationError carries
+          the entry, the locale, and the field at fault as attributes, so a service can
+          route the failure, and repeats them in one sentence a lexicon author can act
+          on without reading any Python.
+document  entry "movie", locale de-DE, with `"alternates": "spielfilm"` — a bare string
+          where the format wants an array of labels.
+raised    ValidationError
+entry     movie
+locale    de-DE
+field     alternates
+message   Entity 'movie', locale 'de-DE': field 'alternates' must be an array of labels,
+          not a string.
+held      the loader refused the document rather than handing back a half-checked one,
+          and the refusal names all three coordinates — both as attributes to branch on
+          and in the message an author reads.
+
+--- 3. An exact match reports the entity, the form, the span, and the tier [C4] ---
+
+claim     transform() returns a typed match report: the prompt it was given, the locale
+          that resolved it, and an ordered list of matches — each naming the entity, the
+          surface form it matched, its character span, and its score tier.
+prompt    "wo ist die rechnung"
+locale    de-DE
+matches   1
+match     invoice ← "rechnung"  span=(11, 19)  tier=preferred  locale=de-DE
+typed     prompt[11:19] == "rechnung"
+held      the span indexes the prompt as typed, so slicing the original text by it gives
+          back exactly the surface form the match reports — no second search, no
+          normalized copy to reconcile.
+
+--- 4. Preferred, alternate and canonical each resolve and each name their tier [C4] ---
+
+claim     A match names the tier it scored in, and the ranking is fixed: preferred beats
+          alternate beats canonical. A tenant's own vocabulary outranks a synonym they
+          also accept, and both outrank the entry identifier their users never see.
+preferred "wo sind die filme" → product ← "filme"  span=(12, 17)  tier=preferred
+          locale=de-DE  entry=movie  filter={genre=drama|thriller, productType=Movie}
+alternate "wo ist der spielfilm" → product ← "spielfilm"  span=(11, 20)  tier=alternate
+          locale=de-DE  entry=movie  filter={genre=drama|thriller, productType=Movie}
+canonical "wo sind die series" → product ← "series"  span=(12, 18)  tier=canonical
+          locale=de-DE  entry=series  filter={episodic=true, productType=Series}
+held      all three tiers were observed, each one named by the match that came back
+          rather than inferred from which prompt was sent.
+
+--- 5. Two entries resolve to one entity, each with its own filter [C19] ---
+
+claim     Several entries may resolve to one entity. Every match names the entity a
+          backend queries, the entry that answered, and that entry's filter — carried
+          verbatim and never interpreted — so a service builds its query from the match
+          report instead of keeping a per-tenant table of its own.
+match     "zeig mir die filme" → product ← "filme"  span=(13, 18)  tier=preferred
+          locale=de-DE  entry=movie  filter={genre=drama|thriller, productType=Movie}
+match     "zeig mir die serien" → product ← "serien"  span=(13, 19)  tier=preferred
+          locale=de-DE  entry=series  filter={episodic=true, productType=Series}
+spelling  the boolean filter value reads `episodic=true` — the spelling the lexicon file
+          uses, not Python's `True`. A reader is here to learn what their own document
+          says.
+held      both matches name one entity, and each names its own entry and its own filter.
+          The entry is a field of its own, so a service knows which of the two to key
+          on; the filter is the tenant's own words, so it can go straight into a query.
+
+--- 6. A typo resolves and carries its correction; with fuzzy off it does not [C5] ---
+
+claim     Typo tolerance is on by default, inside a length-aware edit budget. A fuzzy
+          match resolves to the form the tenant declared and carries the correction —
+          the text the user actually typed — so a service can echo the user's words
+          while querying the tenant's. `fuzzy=False` turns the pass off entirely.
+prompt    "zeig mir die flme"
+tolerant  product ← "filme"  span=(13, 17)  tier=preferred  locale=de-DE  entry=movie
+          filter={genre=drama|thriller, productType=Movie}  correction="flme"
+typed     prompt[13:17] == "flme"
+exact     EntityResolver.from_file(..., fuzzy=False) → 0 matches, resolved via de-DE
+held      the same prompt resolves with tolerance on and resolves to nothing with it
+          off. A reader can see what the fuzzy pass is doing, and what turning it off
+          costs them, rather than taking either on faith.
+
+--- 7. An undeclared locale variant resolves, and the report names what answered [C6] ---
+
+claim     A caller states the locale and lexiqr never guesses it. When the requested
+          locale produces no match, resolution walks a chain — the exact locale, then
+          that language's other variants in tag order, then the declared default — and
+          stops at the first locale that answers. The report names that locale.
+declared  ar-EG, de-AT, de-DE, en-GB — default de-DE, with de-AT authored on one entry
+          only
+de-CH     "wo ist der film" → product ← "film"  span=(11, 15)  tier=preferred
+          locale=de-DE  entry=movie  filter={genre=drama|thriller, productType=Movie}
+de-AT     "wo ist die faktura" → invoice ← "faktura"  span=(11, 18)  tier=preferred
+          locale=de-AT
+de-AT     "wo ist die rechnung" → invoice ← "rechnung"  span=(11, 19)  tier=preferred
+          locale=de-DE
+answered  de-CH → de-DE, de-AT → de-AT, de-AT → de-DE
+held      a variant the lexicon never declares is answered by a sibling or by the
+          default; a variant it does author answers its own prompts and falls through
+          only for the forms it does not declare. Either way the report says which
+          locale it was.
+
+--- 8. Accents fold, spans stay on the typed text, and Arabic keeps its script [C7] ---
+
+claim     Normalization is decided per script. In a Latin-script locale a diacritic is a
+          spelling variant a user may reasonably omit, so accents are folded and both
+          spellings resolve to the one declared form — while the span keeps indexing the
+          prompt as typed. Arabic is matched script-preserving: casefolded, and
+          otherwise left exactly as written.
+de-DE     "wo ist die übertragung" → broadcast ← "übertragung"  span=(11, 22)
+          tier=preferred  locale=de-DE
+typed     prompt[11:22] == "übertragung"
+de-DE     "wo ist die ubertragung" → broadcast ← "übertragung"  span=(11, 22)
+          tier=preferred  locale=de-DE
+typed     prompt[11:22] == "ubertragung"
+ar-EG     "أين أفلام" → product ← "أفلام"  span=(4, 9)  tier=preferred  locale=ar-EG
+          entry=movie  filter={genre=drama|thriller, productType=Movie}
+typed     prompt[4:9] == "أفلام"
+hamza     "أين افلام" → 0 matches — the same word with a bare alef in place of its
+          hamza. In Arabic that is a different letter, not a mark to discard.
+held      one declared form matched by two Latin spellings, and every span points at the
+          characters the user typed rather than at a folded copy of them. Arabic is not
+          folded to ASCII, so its script survives the round trip.
+
+--- 9. A sentence returns in position order, and an overlap keeps the longest [C4] ---
+
+claim     A report's matches come back ordered by position, so a caller can walk them
+          alongside the text they came from. Where one declared label sits inside
+          another, the longest span wins: a tenant who wrote a precise multi-word label
+          meant that label, not the shorter one inside it.
+sentence  "wo ist die rechnung für den film"
+match     invoice ← "rechnung"  span=(11, 19)  tier=preferred  locale=de-DE
+match     product ← "film"  span=(28, 32)  tier=preferred  locale=de-DE  entry=movie
+          filter={genre=drama|thriller, productType=Movie}
+order     (11, 19), (28, 32) — ascending, in the order the report returned them
+overlap   "wo ist der film des jahres" → 1 match
+match     award ← "film des jahres"  span=(11, 26)  tier=preferred  locale=de-DE
+shorter   "wo ist der film" → product ← "film"  span=(11, 15)  tier=preferred
+          locale=de-DE  entry=movie  filter={genre=drama|thriller, productType=Movie}
+held      the sentence's two entities came back in position order. The shorter form
+          'film' resolves perfectly well on its own, so its absence from the overlapping
+          prompt is a decision lexiqr made, not a gap in the lexicon.
+
+--- 10. Oversized input is refused; whitespace-only is an empty report [C8] ---
+
+claim     Exceeding the documented maximum prompt length is a *failure*: it raises
+          before any matching work, so hostile input costs a rejection rather than a
+          full pipeline pass. Empty or whitespace-only input is a *result*: the user
+          typed nothing, which is an ordinary answer and not an error.
+limit     MAX_PROMPT_LENGTH == 10000, exported from lexiqr — this run reads the constant
+          rather than repeating the number
+accepted  10000 characters → 0 matches, resolved via de-DE
+refused   10001 characters → ValidationError
+field     prompt
+message   Prompt exceeds the maximum length of 10000 characters (got 10001).
+blank     '   \t  ' → 0 matches, resolved via de-DE — a report, not an exception
+held      the documented limit is exactly the boundary: at it, a report; one past it, a
+          refusal naming the field. Whitespace-only comes back as an empty report that
+          still carries the prompt and the locale, so a caller needs no special case for
+          it.
+
+--- 11. A report round-trips, and serializes byte-identically twice [C9] ---
+
+claim     A match report has a canonical serialization: keys in sorted order, no
+          insignificant whitespace, pure ASCII. Two byte-equal serializations mean two
+          equal reports and nothing else, and deserializing gives the report back with
+          its types — so a filter read out of storage still compares equal to a freshly
+          resolved one.
+prompt    "zeig mir die filme"
+canonical {"locale":"de-DE","matches":[{"canonical_id":"product","correction":null,"ent…
+form      276 characters, ASCII-only: True, cut above to one line
+restored  deserialize_report(serialize_report(report)) == report → True
+stable    serialize_report(report) twice, byte-identical → True
+filter    the restored filter is a Metadata again, equal to the original: True
+held      the report survived the round trip whole, and serializing it twice gave the
+          same bytes. A snapshot taken from this is a snapshot that still means
+          something later.
+
+--- 12. The same lexicon through `lexiqr validate` and `lexiqr try` [C14, C15] ---
+
+claim     The same file the sections above resolved against runs through both CLI
+          commands, and each command's exit code is a contract a script branches on. A
+          valid lexicon and a resolved prompt exit zero; a valid lexicon whose prompt
+          resolved nothing has its own code, distinct from every way loading can fail.
+invoked   as `python -m lexiqr.cli …` from examples/, so nothing depends on PATH or on
+          the console script. The codes below are read from the CLI's named constants.
+command   lexiqr validate medien.lexicon.json
+output    medien.lexicon.json: valid lexicon.
+exit      0 (EXIT_OK)
+command   lexiqr try medien.lexicon.json --locale de-DE 'wo sind die filme'
+output    prompt: "wo sind die [filme]"
+          resolved via: de-DE
+          1 match:
+          
+            [1] product ← "filme"
+                tier: preferred   locale: de-DE   text: "filme"
+                entry: movie
+                filter: genre=drama|thriller, productType=Movie
+exit      0 (EXIT_OK)
+command   lexiqr try medien.lexicon.json --locale de-DE 'wo ist das wetter'
+output    prompt: "wo ist das wetter"
+          resolved via: de-DE
+          no match
+exit      4 (EXIT_NO_MATCH)
+held      both commands ran against the same document, each printing what a lexicon
+          author sees and returning the code a script reads. The report above is the
+          CLI's own rendering, not this run's — which is why the two look different.
+
+OK: every section held.

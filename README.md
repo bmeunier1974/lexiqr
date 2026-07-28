@@ -90,6 +90,71 @@ resolved via: de-DE
 
 The `fuzzy` keyword — accepted by `EntityResolver(...)`, `from_file`, and `from_dict`, defaulting to `True` — is public, semver-governed API; pass `fuzzy=False` for exact-only behaviour.
 
+## The whole contract, in one command
+
+The quickstart above is the five-minute story. This is the long one: a single
+command that resolves a realistic tenant lexicon and prints twelve narrated
+sections, each stating a claim, showing what lexiqr produced, and asserting it.
+
+```bash
+uv run python examples/demo.py
+```
+
+It **exits non-zero naming the section that failed**, so it is a verification and
+not a brochure. Its input is [`examples/medien.lexicon.json`](examples/medien.lexicon.json),
+a German media tenant, and the file itself — [`examples/demo.py`](examples/demo.py) —
+is one flat file you can read top to bottom and copy a section out of. It imports
+nothing but lexiqr and the standard library.
+
+What the twelve sections claim:
+
+1. a tenant lexicon loads from a file — validation *is* construction (**C2**)
+2. a rejected lexicon names the entry, locale and field at fault (**C3**)
+3. an exact match reports its entity, surface form, span into the original prompt, and score tier (**C4**)
+4. preferred, alternate and canonical tiers each resolve and each name their tier (**C4**)
+5. two entries resolve to one `product`, each reporting its own entry ID and filter (**C19**)
+6. a typo resolves and carries its correction; the same prompt with `fuzzy=False` does not (**C5**)
+7. a prompt in an undeclared locale variant resolves through the fallback chain, and the report names the locale that answered (**C6**)
+8. accented and unaccented spellings both match with spans still on the typed text; Arabic matches script-preserving (**C7**)
+9. two entities in one prompt come back ordered by position, and an overlap resolves to the longest span (**C4**)
+10. a prompt over the documented maximum length is refused before any matching; whitespace-only is an empty report, not an error (**C8**)
+11. a report round-trips through the canonical serialization and serializes byte-identically twice (**C9**)
+12. the same lexicon through `lexiqr validate` and `lexiqr try`, with the exit codes a script reads (**C14**, **C15**)
+
+**Three claims it deliberately does not make**, each owned by a gate of its own —
+a transcript this long should not be read as the whole guarantee:
+
+- **the performance envelope** — owned by the CI perf gate (`uv run pytest -m perf`); see [Performance envelope](#performance-envelope) below;
+- **cross-platform report equality** — owned by the report-equality matrix job, which compares every OS and Python against `scripts/report_equality.golden.json`;
+- **installability from PyPI** — owned by the release workflow's clean-virtualenv leg, which installs the published wheel and runs against it.
+
+An abridged excerpt of the real output — sections 5 and 6, with the other ten
+elided. The full transcript is committed as
+[`examples/demo.golden.txt`](examples/demo.golden.txt), and the test suite
+compares the command's output to it:
+
+<!-- quickstart:skip -->
+```text
+lexiqr — a sample run: every claim printed, every claim asserted.
+lexicon: examples/medien.lexicon.json
+
+--- 5. Two entries resolve to one entity, each with its own filter [C19] ---
+
+match     "zeig mir die filme" → product ← "filme"  span=(13, 18)  tier=preferred
+          locale=de-DE  entry=movie  filter={genre=drama|thriller, productType=Movie}
+match     "zeig mir die serien" → product ← "serien"  span=(13, 19)  tier=preferred
+          locale=de-DE  entry=series  filter={episodic=true, productType=Series}
+
+--- 6. A typo resolves and carries its correction; with fuzzy off it does not [C5] ---
+
+prompt    "zeig mir die flme"
+tolerant  product ← "filme"  span=(13, 17)  tier=preferred  locale=de-DE  entry=movie
+          filter={genre=drama|thriller, productType=Movie}  correction="flme"
+exact     EntityResolver.from_file(..., fuzzy=False) → 0 matches, resolved via de-DE
+
+OK: every section held.
+```
+
 ## Validating a lexicon on its own
 
 Validation *is* construction: `Lexicon.from_file` (and `from_dict`) either returns

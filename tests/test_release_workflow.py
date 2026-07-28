@@ -5,7 +5,8 @@ gate is: by reading `release.yml` and asserting what it promises. The point is
 that publishing targets *real* PyPI via trusted publishing with no long-lived
 token, that a bad tag can never reach the publish job, and that "the workflow
 was green" and "the package installs and works" are made the same statement by a
-post-publish job that installs from PyPI and reproduces the flooff match.
+post-publish job that installs from PyPI and then verifies it twice over: the
+minimal flooff canary, and the full twelve-claim sample run.
 """
 
 from typing import Any, cast
@@ -87,3 +88,56 @@ def test_the_verify_job_reproduces_flooff_and_calls_the_console_entry_point(
 
     assert "reproduce_flooff.py" in script  # C1: the published artifact resolves
     assert "/clean-venv/bin/lexiqr" in script  # the console entry point is callable
+
+
+def test_the_verify_job_runs_the_full_sample_run_against_the_installed_package(
+    workflow: dict[str, Any],
+) -> None:
+    """A publish verified by twelve claims, not one.
+
+    The sample run was written stdlib-and-lexiqr-only, on a path derived from its
+    own location, precisely so it could be pointed at an installed package. Here
+    it is, against the wheel that was just published — run for its exit code
+    only. The golden comparison is a test concern, and this commit's CI has
+    already pinned the shipped wording across all four supported Pythons;
+    re-comparing it here would only add a way for a release to fail for a reason
+    already covered.
+    """
+    verify = workflow["jobs"]["verify"]
+    script = "\n".join(step.get("run", "") for step in verify["steps"])
+
+    assert "examples/demo.py" in script, (
+        "the release no longer runs the sample run against what it published"
+    )
+    assert "/clean-venv/bin/python examples/demo.py" in script, (
+        "the sample run is not executed by the clean virtualenv's interpreter, so "
+        "it would be testing the runner's environment rather than the published "
+        "package"
+    )
+    assert "demo.golden.txt" not in script, (
+        "the release job compares the golden; that is a test concern, and CI has "
+        "already pinned the shipped wording on this commit"
+    )
+
+
+def test_the_minimal_canary_survives_alongside_the_full_sample_run(
+    workflow: dict[str, Any],
+) -> None:
+    """One claim is worth keeping when twelve are what broke.
+
+    Twelve claims tell a maintainer a lot when they pass and less than they would
+    like when they fail. The flooff canary resolves one word and prints one line,
+    so it is the signal that still means something unambiguous when the sample run
+    is itself the thing that went wrong.
+    """
+    verify = workflow["jobs"]["verify"]
+    script = "\n".join(step.get("run", "") for step in verify["steps"])
+
+    assert "reproduce_flooff.py" in script and "examples/demo.py" in script, (
+        "the release verifies with one of the two rather than both; they answer "
+        "different questions"
+    )
+    assert script.index("reproduce_flooff.py") < script.index("examples/demo.py"), (
+        "the twelve-claim run comes before the one-claim canary, so a broken "
+        "sample run would mask the simpler signal"
+    )
