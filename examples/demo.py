@@ -458,6 +458,69 @@ def two_entries_resolve_to_one_entity_with_their_own_filters() -> None:
     )
 
 
+#: A misspelling of the declared plural "filme", one deletion away from it and so
+#: inside the edit budget a six-character form earns.
+A_PROMPT_WITH_A_TYPO = "zeig mir die flme"
+
+
+def a_typo_carries_its_correction_and_fuzzy_off_does_not() -> None:
+    """A typo resolves and carries its correction; with fuzzy off it does not [C5]
+
+    Typo tolerance is the claim most often taken on faith, because a
+    demonstration that only shows it succeeding says nothing about where it
+    stops. So the same prompt is resolved twice, and the contrast is the point.
+    """
+    tolerant = EntityResolver.from_file(LEXICON)
+    exact_only = EntityResolver.from_file(LEXICON, fuzzy=False)
+
+    with_tolerance = tolerant.transform(A_PROMPT_WITH_A_TYPO, "de-DE")
+    without = exact_only.transform(A_PROMPT_WITH_A_TYPO, "de-DE")
+    match = with_tolerance.matches[0]
+    start, end = match.span
+
+    emit(
+        "claim",
+        "Typo tolerance is on by default, inside a length-aware edit budget. A "
+        "fuzzy match resolves to the form the tenant declared and carries the "
+        "correction — the text the user actually typed — so a service can echo "
+        "the user's words while querying the tenant's. `fuzzy=False` turns the "
+        "pass off entirely.",
+    )
+    emit("prompt", f'"{A_PROMPT_WITH_A_TYPO}"')
+    emit("tolerant", render_match(match))
+    emit("typed", f'prompt[{start}:{end}] == "{A_PROMPT_WITH_A_TYPO[start:end]}"')
+    emit(
+        "exact",
+        f"EntityResolver.from_file(..., fuzzy=False) → "
+        f"{len(without.matches)} matches, resolved via {without.locale}",
+    )
+    emit(
+        "held",
+        "the same prompt resolves with tolerance on and resolves to nothing with "
+        "it off. A reader can see what the fuzzy pass is doing, and what turning "
+        "it off costs them, rather than taking either on faith.",
+    )
+
+    assert len(with_tolerance.matches) == 1, (
+        f"the typo was meant to resolve to one match, and gave {with_tolerance.matches}"
+    )
+    assert match.correction == A_PROMPT_WITH_A_TYPO[start:end], (
+        f"the correction {match.correction!r} is not the text the span points at, "
+        f"{A_PROMPT_WITH_A_TYPO[start:end]!r}"
+    )
+    assert match.correction != match.surface_form, (
+        f"the correction and the surface form are both {match.correction!r}, so "
+        f"this prompt is not a typo at all and the section shows nothing"
+    )
+    assert not without.matches, (
+        f"the same prompt resolved with fuzzy off, so the two halves of this "
+        f"section say the same thing: {without.matches}"
+    )
+    assert without.prompt == A_PROMPT_WITH_A_TYPO, (
+        "an exact-only resolver still returns a report naming the prompt it read"
+    )
+
+
 # --- The driver --------------------------------------------------------------
 
 
@@ -483,6 +546,7 @@ SECTIONS: tuple[Section, ...] = (
     an_exact_match_reports_entity_form_span_and_tier,
     every_score_tier_resolves_and_names_itself,
     two_entries_resolve_to_one_entity_with_their_own_filters,
+    a_typo_carries_its_correction_and_fuzzy_off_does_not,
 )
 
 

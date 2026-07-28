@@ -415,6 +415,34 @@ def test_the_transcript_spells_a_boolean_filter_the_way_the_lexicon_does() -> No
         )
 
 
+def test_the_transcript_shows_both_halves_of_typo_tolerance() -> None:
+    """Section 6's contrast, resolved here rather than read off the golden.
+
+    Both halves matter. A demonstration that only shows tolerance succeeding
+    tells a reader nothing about its boundary, so the section is only honest if
+    the same prompt really does come back empty with the keyword off — and that
+    is asserted against the resolver, not against the transcript's own wording.
+    """
+    prompt = demo.A_PROMPT_WITH_A_TYPO
+    tolerant = EntityResolver.from_file(LEXICON).transform(prompt, "de-DE")
+    exact_only = EntityResolver.from_file(LEXICON, fuzzy=False).transform(
+        prompt, "de-DE"
+    )
+    printed = transcript_of("a_typo_carries_its_correction_and_fuzzy_off_does_not")
+
+    assert len(tolerant.matches) == 1, f"the typo no longer resolves: {tolerant}"
+    assert not exact_only.matches, f"the typo resolves with fuzzy off: {exact_only}"
+
+    match = tolerant.matches[0]
+    assert match.correction is not None, "the fuzzy match carries no correction"
+    assert f'correction="{match.correction}"' in printed, (
+        f"the section does not name what was typed: {match.correction!r}"
+    )
+    assert collapsed(demo.render_match(match)) in printed, (
+        f"the section does not show the match tolerance produced: {match}"
+    )
+
+
 def test_the_run_records_how_its_golden_is_regenerated() -> None:
     """A golden nobody knows how to rebuild is a golden that gets hand-edited.
 

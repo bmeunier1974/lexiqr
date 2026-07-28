@@ -78,4 +78,19 @@ held      both matches name one entity, and each names its own entry and its own
           The entry is a field of its own, so a service knows which of the two to key
           on; the filter is the tenant's own words, so it can go straight into a query.
 
+--- 6. A typo resolves and carries its correction; with fuzzy off it does not [C5] ---
+
+claim     Typo tolerance is on by default, inside a length-aware edit budget. A fuzzy
+          match resolves to the form the tenant declared and carries the correction —
+          the text the user actually typed — so a service can echo the user's words
+          while querying the tenant's. `fuzzy=False` turns the pass off entirely.
+prompt    "zeig mir die flme"
+tolerant  product ← "filme"  span=(13, 17)  tier=preferred  locale=de-DE  entry=movie
+          filter={genre=drama|thriller, productType=Movie}  correction="flme"
+typed     prompt[13:17] == "flme"
+exact     EntityResolver.from_file(..., fuzzy=False) → 0 matches, resolved via de-DE
+held      the same prompt resolves with tolerance on and resolves to nothing with it
+          off. A reader can see what the fuzzy pass is doing, and what turning it off
+          costs them, rather than taking either on faith.
+
 OK: every section held.
