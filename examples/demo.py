@@ -43,6 +43,7 @@ from pathlib import Path
 from typing import Any, Protocol, cast
 
 from lexiqr import (
+    MAX_PROMPT_LENGTH,
     EntityMatch,
     EntityResolver,
     Lexicon,
@@ -50,6 +51,8 @@ from lexiqr import (
     MetadataValue,
     ScoreTier,
     ValidationError,
+    deserialize_report,
+    serialize_report,
 )
 
 #: The tenant lexicon every section resolves against, found relative to this
@@ -165,6 +168,18 @@ def slice_of(prompt: str, match: EntityMatch) -> str:
     """
     start, end = match.span
     return f'prompt[{start}:{end}] == "{prompt[start:end]}"'
+
+
+def abbreviated(text: str) -> str:
+    """`text` cut to one transcript line, so a long value cannot break the layout.
+
+    The canonical serialization carries no whitespace at all, which means nothing
+    can wrap it — a 300-character line would run off the side of every terminal
+    and every README that quotes this. Its length is printed beside it, so what
+    was cut is not hidden.
+    """
+    room = WIDTH - LABEL_WIDTH
+    return text if len(text) <= room else f"{text[: room - 1]}…"
 
 
 def heading(number: int, title: str) -> None:
@@ -774,6 +789,166 @@ def a_sentence_is_ordered_by_position_and_an_overlap_resolved() -> None:
     )
 
 
+#: Spaces and a tab and nothing else. Printed with `repr` in the transcript, both
+#: so a reader can see what it holds and so the tab cannot vanish into the
+#: line-wrapping.
+A_WHITESPACE_ONLY_PROMPT = "   \t  "
+
+
+def bounded_input_is_refused_or_answered_but_never_hangs() -> None:
+    """Oversized input is refused; whitespace-only is an empty report [C8]
+
+    Two inputs a caller might lump together as "bad", with two different
+    outcomes. Error handling has to cover them differently, so the difference is
+    worth seeing rather than reading.
+    """
+    resolver = EntityResolver.from_file(LEXICON)
+
+    emit(
+        "claim",
+        "Exceeding the documented maximum prompt length is a *failure*: it raises "
+        "before any matching work, so hostile input costs a rejection rather than "
+        "a full pipeline pass. Empty or whitespace-only input is a *result*: the "
+        "user typed nothing, which is an ordinary answer and not an error.",
+    )
+    emit(
+        "limit",
+        f"MAX_PROMPT_LENGTH == {MAX_PROMPT_LENGTH}, exported from lexiqr — this run "
+        f"reads the constant rather than repeating the number",
+    )
+
+    at_the_limit = resolver.transform("x" * MAX_PROMPT_LENGTH, "de-DE")
+    emit(
+        "accepted",
+        f"{MAX_PROMPT_LENGTH} characters → {len(at_the_limit.matches)} matches, "
+        f"resolved via {at_the_limit.locale}",
+    )
+
+    try:
+        resolver.transform("x" * (MAX_PROMPT_LENGTH + 1), "de-DE")
+    except ValidationError as invalid:
+        refused = invalid
+    else:
+        raise AssertionError(
+            f"a prompt of {MAX_PROMPT_LENGTH + 1} characters was accepted, one past "
+            f"the limit lexiqr documents"
+        )
+
+    emit("refused", f"{MAX_PROMPT_LENGTH + 1} characters → {type(refused).__name__}")
+    emit("field", refused.field or "(none)")
+    emit("message", str(refused))
+
+    blank = resolver.transform(A_WHITESPACE_ONLY_PROMPT, "de-DE")
+    emit(
+        "blank",
+        f"{A_WHITESPACE_ONLY_PROMPT!r} → {len(blank.matches)} matches, resolved via "
+        f"{blank.locale} — a report, not an exception",
+    )
+    emit(
+        "held",
+        "the documented limit is exactly the boundary: at it, a report; one past "
+        "it, a refusal naming the field. Whitespace-only comes back as an empty "
+        "report that still carries the prompt and the locale, so a caller needs no "
+        "special case for it.",
+    )
+
+    assert refused.field == "prompt", (
+        f"the refusal names the field {refused.field!r} rather than the prompt"
+    )
+    assert str(MAX_PROMPT_LENGTH) in str(refused), (
+        f"the refusal does not name the limit it enforced: {refused}"
+    )
+    assert not at_the_limit.matches, (
+        f"a prompt of {MAX_PROMPT_LENGTH} x's was meant to resolve to nothing and "
+        f"gave {at_the_limit.matches}"
+    )
+    assert not blank.matches, (
+        f"whitespace-only input resolved to {blank.matches} rather than nothing"
+    )
+    assert blank.prompt == A_WHITESPACE_ONLY_PROMPT, (
+        "the empty report does not carry the prompt it was handed"
+    )
+    assert blank.locale == "de-DE", (
+        f"the empty report resolved via {blank.locale!r} rather than the requested "
+        f"locale"
+    )
+
+
+#: A prompt whose report exercises every field the serialization carries: an
+#: entry that differs from its entity, and a filter with both value shapes.
+A_PROMPT_TO_SERIALIZE = "zeig mir die filme"
+
+
+def a_report_round_trips_through_its_canonical_serialization() -> None:
+    """A report round-trips, and serializes byte-identically twice [C9]
+
+    What a developer is trusting when they store a snapshot of a report in their
+    own test suite and compare against it months later.
+    """
+    report = EntityResolver.from_file(LEXICON).transform(A_PROMPT_TO_SERIALIZE, "de-DE")
+    serialized = serialize_report(report)
+    again = serialize_report(report)
+    restored = deserialize_report(serialized)
+
+    emit(
+        "claim",
+        "A match report has a canonical serialization: keys in sorted order, no "
+        "insignificant whitespace, pure ASCII. Two byte-equal serializations mean "
+        "two equal reports and nothing else, and deserializing gives the report "
+        "back with its types — so a filter read out of storage still compares "
+        "equal to a freshly resolved one.",
+    )
+    emit("prompt", f'"{A_PROMPT_TO_SERIALIZE}"')
+    emit("canonical", abbreviated(serialized))
+    emit(
+        "form",
+        f"{len(serialized)} characters, ASCII-only: {serialized.isascii()}, cut "
+        f"above to one line",
+    )
+    emit(
+        "restored",
+        f"deserialize_report(serialize_report(report)) == report → "
+        f"{restored == report}",
+    )
+    emit(
+        "stable",
+        f"serialize_report(report) twice, byte-identical → {again == serialized}",
+    )
+    emit(
+        "filter",
+        f"the restored filter is a {type(restored.matches[0].metadata).__name__} "
+        f"again, equal to the original: "
+        f"{restored.matches[0].metadata == report.matches[0].metadata}",
+    )
+    emit(
+        "held",
+        "the report survived the round trip whole, and serializing it twice gave "
+        "the same bytes. A snapshot taken from this is a snapshot that still means "
+        "something later.",
+    )
+
+    assert restored == report, (
+        f"the report did not survive the round trip:\n  before {report}\n  after "
+        f"{restored}"
+    )
+    assert again == serialized, (
+        f"two serializations of one report differ:\n  {serialized}\n  {again}"
+    )
+    assert serialized.isascii(), (
+        f"the canonical form is not pure ASCII, so it carries something "
+        f"environment-dependent: {serialized}"
+    )
+    assert report.matches, (
+        "an empty report round-trips trivially; this section is only worth "
+        "anything on a report that carries matches"
+    )
+    assert isinstance(restored.matches[0].metadata, Metadata), (
+        f"the restored filter came back as a "
+        f"{type(restored.matches[0].metadata).__name__}, so the round trip "
+        f"restored values but not types"
+    )
+
+
 # --- The driver --------------------------------------------------------------
 
 
@@ -803,6 +978,8 @@ SECTIONS: tuple[Section, ...] = (
     an_undeclared_locale_variant_walks_the_fallback_chain,
     normalization_folds_accents_and_preserves_arabic,
     a_sentence_is_ordered_by_position_and_an_overlap_resolved,
+    bounded_input_is_refused_or_answered_but_never_hangs,
+    a_report_round_trips_through_its_canonical_serialization,
 )
 
 

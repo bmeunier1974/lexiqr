@@ -29,6 +29,7 @@ from __future__ import annotations
 import ast
 import json
 import os
+import re
 import subprocess
 import sys
 from dataclasses import replace
@@ -40,12 +41,15 @@ import pytest
 
 from conftest import REPO_ROOT
 from lexiqr import (
+    MAX_PROMPT_LENGTH,
     EntityMatch,
     EntityResolver,
     Lexicon,
     Metadata,
     ScoreTier,
     ValidationError,
+    deserialize_report,
+    serialize_report,
 )
 
 EXAMPLES = REPO_ROOT / "examples"
@@ -616,6 +620,115 @@ def test_the_transcript_resolves_an_overlap_to_the_longest_span() -> None:
     )
     assert collapsed(demo.render_match(won)) in printed, (
         f"the section does not show the match that won the overlap: {won}"
+    )
+
+
+def test_the_transcript_tells_a_refusal_from_an_empty_report() -> None:
+    """Section 10's two outcomes, and the boundary between them.
+
+    These are the two cases an integrating developer's error handling has to
+    cover differently, and the limit is read from the exported constant here as
+    well as in the run — a literal on either side would let the two drift.
+    """
+    resolver = EntityResolver.from_file(LEXICON)
+    printed = transcript_of("bounded_input_is_refused_or_answered_but_never_hangs")
+
+    with pytest.raises(ValidationError) as refused:
+        resolver.transform("x" * (MAX_PROMPT_LENGTH + 1), "de-DE")
+    at_the_limit = resolver.transform("x" * MAX_PROMPT_LENGTH, "de-DE")
+    blank = resolver.transform(demo.A_WHITESPACE_ONLY_PROMPT, "de-DE")
+
+    assert not at_the_limit.matches, "a prompt of exactly the limit is a report"
+    assert not blank.matches, "a whitespace-only prompt is an empty report"
+    assert blank.prompt == demo.A_WHITESPACE_ONLY_PROMPT, (
+        "the empty report does not carry the prompt it read"
+    )
+    assert str(MAX_PROMPT_LENGTH) in printed, (
+        f"the section does not name the documented limit {MAX_PROMPT_LENGTH}"
+    )
+    assert collapsed(str(refused.value)) in printed, (
+        f"the section does not carry the refusal the resolver raised: {refused.value}"
+    )
+
+
+def test_the_transcript_shows_a_report_round_tripping_through_its_serialization() -> (
+    None
+):
+    """Section 11's claim, verified here rather than read off the transcript.
+
+    A developer who snapshots a report in their own test suite is trusting
+    exactly this, so the round trip and the byte-stability are exercised against
+    the public serialization rather than compared against printed wording.
+    """
+    report = EntityResolver.from_file(LEXICON).transform(
+        demo.A_PROMPT_TO_SERIALIZE, "de-DE"
+    )
+    printed = transcript_of("a_report_round_trips_through_its_canonical_serialization")
+    serialized = serialize_report(report)
+
+    assert deserialize_report(serialized) == report, "the report did not round-trip"
+    assert serialize_report(report) == serialized, "two serializations differ"
+    assert serialized.isascii(), f"the canonical form is not pure ASCII: {serialized}"
+    assert str(len(serialized)) in printed, (
+        f"the section does not name the serialization's length, {len(serialized)}"
+    )
+    assert demo.abbreviated(serialized) in printed, (
+        "the section does not show the serialization it produced"
+    )
+
+
+#: The capabilities this run claims to demonstrate — the epic's section table,
+#: written here rather than derived from the run, because a set read out of the
+#: sections could not notice a section going missing. Grows when the run grows a
+#: claim; shrinking it is a decision somebody has to make on purpose.
+THE_CAPABILITIES_THE_RUN_CLAIMS = frozenset(
+    {"C2", "C3", "C4", "C5", "C6", "C7", "C8", "C9", "C19"}
+)
+
+#: A capability tag as the section titles carry it: `[C19]`.
+CAPABILITY_TAG = re.compile(r"\[(C\d+)\]")
+
+
+def test_every_capability_the_run_claims_appears_in_its_output() -> None:
+    """The assertion that stops a future edit from quietly reducing the run.
+
+    The golden comparison cannot see this: delete a section, regenerate, and the
+    two agree again. The section-count check cannot either, since a run that
+    declares fewer sections is internally consistent. So the claims are listed
+    here, independently, and every one of them has to be somewhere in the
+    transcript.
+    """
+    tagged = set(CAPABILITY_TAG.findall(GOLDEN.read_text(encoding="utf-8")))
+
+    missing = THE_CAPABILITIES_THE_RUN_CLAIMS - tagged
+    assert not missing, (
+        f"the run no longer demonstrates {', '.join(sorted(missing))}. Either the "
+        f"section that claimed it is gone — put it back — or the claim was dropped "
+        f"on purpose, in which case remove it from "
+        f"THE_CAPABILITIES_THE_RUN_CLAIMS and say why."
+    )
+    stray = tagged - THE_CAPABILITIES_THE_RUN_CLAIMS
+    assert not stray, (
+        f"the transcript claims {', '.join(sorted(stray))}, which this test does "
+        f"not know about; add them here if the claim is real"
+    )
+
+
+def test_every_capability_the_run_claims_is_a_capability_the_vision_declares() -> None:
+    """A tag nobody defined is a claim about nothing.
+
+    `[C19]` is only meaningful because VISION.md says what C19 is. A typo — or a
+    capability invented for the transcript's convenience — would read to a
+    maintainer as a covered promise, so it is checked against the source.
+    """
+    vision = (REPO_ROOT / "VISION.md").read_text(encoding="utf-8")
+    declared = set(re.findall(r"\*\*(C\d+)\*\*", vision))
+
+    assert declared, "no capabilities found in VISION.md; this check is vacuous"
+    undeclared = THE_CAPABILITIES_THE_RUN_CLAIMS - declared
+    assert not undeclared, (
+        f"the run claims {', '.join(sorted(undeclared))}, which VISION.md does not "
+        f"declare"
     )
 
 

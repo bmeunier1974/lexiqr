@@ -154,4 +154,39 @@ held      the sentence's two entities came back in position order. The shorter f
           'film' resolves perfectly well on its own, so its absence from the overlapping
           prompt is a decision lexiqr made, not a gap in the lexicon.
 
+--- 10. Oversized input is refused; whitespace-only is an empty report [C8] ---
+
+claim     Exceeding the documented maximum prompt length is a *failure*: it raises
+          before any matching work, so hostile input costs a rejection rather than a
+          full pipeline pass. Empty or whitespace-only input is a *result*: the user
+          typed nothing, which is an ordinary answer and not an error.
+limit     MAX_PROMPT_LENGTH == 10000, exported from lexiqr — this run reads the constant
+          rather than repeating the number
+accepted  10000 characters → 0 matches, resolved via de-DE
+refused   10001 characters → ValidationError
+field     prompt
+message   Prompt exceeds the maximum length of 10000 characters (got 10001).
+blank     '   \t  ' → 0 matches, resolved via de-DE — a report, not an exception
+held      the documented limit is exactly the boundary: at it, a report; one past it, a
+          refusal naming the field. Whitespace-only comes back as an empty report that
+          still carries the prompt and the locale, so a caller needs no special case for
+          it.
+
+--- 11. A report round-trips, and serializes byte-identically twice [C9] ---
+
+claim     A match report has a canonical serialization: keys in sorted order, no
+          insignificant whitespace, pure ASCII. Two byte-equal serializations mean two
+          equal reports and nothing else, and deserializing gives the report back with
+          its types — so a filter read out of storage still compares equal to a freshly
+          resolved one.
+prompt    "zeig mir die filme"
+canonical {"locale":"de-DE","matches":[{"canonical_id":"product","correction":null,"ent…
+form      276 characters, ASCII-only: True, cut above to one line
+restored  deserialize_report(serialize_report(report)) == report → True
+stable    serialize_report(report) twice, byte-identical → True
+filter    the restored filter is a Metadata again, equal to the original: True
+held      the report survived the round trip whole, and serializing it twice gave the
+          same bytes. A snapshot taken from this is a snapshot that still means
+          something later.
+
 OK: every section held.
