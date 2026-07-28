@@ -11,8 +11,9 @@ report's character offsets into the *original* prompt, never by re-searching for
 the surface form — which accents and casefolding would make wrong.
 """
 
-from lexiqr import EntityMatch, MatchReport, ScoreTier
+from lexiqr import EntityMatch, MatchReport, Metadata, ScoreTier
 from lexiqr.cli._report import render_match_report
+from lexiqr.metadata import EMPTY
 
 
 def match(
@@ -24,6 +25,7 @@ def match(
     score_tier: ScoreTier = ScoreTier.PREFERRED,
     matched_locale: str = "de-DE",
     correction: str | None = None,
+    metadata: Metadata = EMPTY,
 ) -> EntityMatch:
     return EntityMatch(
         canonical_id=canonical_id,
@@ -33,6 +35,7 @@ def match(
         score_tier=score_tier,
         matched_locale=matched_locale,
         correction=correction,
+        metadata=metadata,
     )
 
 
@@ -169,3 +172,89 @@ def test_many_matches_stay_legible_one_block_per_match() -> None:
         assert f"entity{i}" in rendered
     # The prompt line is rendered once, not repeated per match.
     assert rendered.count("resolved via") == 1
+
+
+# --- The entry that answered, and the filter it carried. Both lines are
+# --- conditional, in the style `correction` already established: a lexicon that
+# --- does not use the feature renders exactly as it did before it existed.
+
+
+def test_a_match_from_a_discriminating_entry_names_the_entry_that_answered() -> None:
+    """An author with two entries on one entity needs to see which one replied;
+    the canonical ID alone cannot tell them."""
+    report = MatchReport(
+        prompt="wo sind die filme",
+        locale="de-DE",
+        matches=(
+            match(canonical_id="product", entry_id="movie", surface_form="filme"),
+        ),
+    )
+
+    rendered = render_match_report(report)
+
+    assert "entry: movie" in rendered
+
+
+def test_a_match_whose_entry_is_its_entity_names_no_entry() -> None:
+    """Repeating the identifier would add a line saying nothing to every match of
+    every lexicon that never uses the feature."""
+    rendered = render_match_report(
+        MatchReport(prompt="wo ist flooff", locale="de-DE", matches=(match(),))
+    )
+
+    assert "entry:" not in rendered
+
+
+def test_a_match_carrying_a_filter_renders_it_with_keys_in_sorted_order() -> None:
+    """Sorted, so two runs of the same command produce the same text — the same
+    reason the serialization sorts."""
+    report = MatchReport(
+        prompt="wo sind die filme",
+        locale="de-DE",
+        matches=(
+            match(
+                canonical_id="product",
+                entry_id="movie",
+                surface_form="filme",
+                metadata=Metadata(
+                    {"productType": "Movie", "genre": ("drama", "thriller"), "age": 12}
+                ),
+            ),
+        ),
+    )
+
+    rendered = render_match_report(report)
+
+    assert "filter: age=12, genre=drama|thriller, productType=Movie" in rendered
+
+
+def test_a_match_with_no_filter_renders_no_filter_line() -> None:
+    rendered = render_match_report(
+        MatchReport(prompt="wo ist flooff", locale="de-DE", matches=(match(),))
+    )
+
+    assert "filter:" not in rendered
+
+
+def test_a_boolean_filter_renders_the_way_the_author_wrote_it() -> None:
+    """The author typed `true` in JSON, so the report says `true`.
+
+    Python spells it `True`; echoing that back would show a lexicon author a value
+    that is not in their file, in a tool whose whole job is telling them what their
+    file does.
+    """
+    report = MatchReport(
+        prompt="wo sind die filme",
+        locale="de-DE",
+        matches=(
+            match(
+                canonical_id="product",
+                entry_id="series",
+                metadata=Metadata({"episodic": True, "archived": False}),
+            ),
+        ),
+    )
+
+    rendered = render_match_report(report)
+
+    assert "filter: archived=false, episodic=true" in rendered

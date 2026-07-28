@@ -96,9 +96,10 @@ lexiqr try my-tenant.lexicon.json --locale de-DE "wo ist flooff"
 `lexiqr try <lexicon> --locale <locale> "<prompt>"` resolves a **prompt**,
 written in a **locale** (a BCP 47 tag), against the lexicon and prints the whole
 match report: every match with its canonical ID, the surface form that matched,
-the span marked in your prompt, the score tier, any correction a fuzzy match
-applied, and the locale that actually answered. Run either command with
-`--help` to see its arguments.
+the span marked in your prompt, the score tier, the locale that actually
+answered, any correction a fuzzy match applied, and — when the entry that
+answered resolves to a different entity, or carries metadata — the entry and its
+filter. Run either command with `--help` to see its arguments.
 
 ### Exit codes
 

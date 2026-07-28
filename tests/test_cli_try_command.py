@@ -14,7 +14,7 @@ from typing import Any
 
 import pytest
 
-from conftest import FLOOFF_LEXICON, flooff_document, lexicon_document
+from conftest import FLOOFF_LEXICON, REPO_ROOT, flooff_document, lexicon_document
 from lexiqr import Lexicon
 from lexiqr.cli import (
     EXIT_CLI_ERROR,
@@ -22,6 +22,12 @@ from lexiqr.cli import (
     EXIT_NO_MATCH,
     EXIT_OK,
     main,
+)
+
+#: A lexicon using the entry model: "movie" and "series" both `product`, each with
+#: the filter that tells them apart.
+MEDIEN_SHARED_ENTITY = (
+    REPO_ROOT / "schema" / "fixtures" / "valid" / "medien-shared-entity.lexicon.json"
 )
 
 
@@ -156,3 +162,41 @@ def test_try_on_malformed_json_is_a_cli_level_failure(
     assert code == EXIT_CLI_ERROR
     assert captured.out == ""
     assert "JSON" in captured.err
+
+
+def test_try_shows_which_entry_answered_and_the_filter_it_carried(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """The one place a lexicon author can confirm the discrimination works.
+
+    They never write Python, so `lexiqr try` is where "did my two entries really
+    resolve to `product` with different filters?" gets answered.
+    """
+    code = main(
+        [
+            "try",
+            str(MEDIEN_SHARED_ENTITY),
+            "--locale",
+            "de-DE",
+            "wo sind die filme",
+        ]
+    )
+
+    captured = capsys.readouterr()
+    assert code == EXIT_OK
+    assert "product" in captured.out
+    assert "entry: movie" in captured.out
+    assert "filter: genre=drama|thriller, productType=Movie" in captured.out
+    assert captured.err == ""
+
+
+def test_try_on_a_lexicon_without_the_feature_prints_no_entry_or_filter_line(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """The flooff scenario's output is byte-for-byte what it always was."""
+    code = main(["try", str(FLOOFF_LEXICON), "--locale", "de-DE", "wo ist flooff"])
+
+    captured = capsys.readouterr()
+    assert code == EXIT_OK
+    assert "entry:" not in captured.out
+    assert "filter:" not in captured.out
