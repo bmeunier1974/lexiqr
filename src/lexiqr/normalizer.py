@@ -23,6 +23,8 @@ from __future__ import annotations
 import unicodedata
 from dataclasses import dataclass
 
+from lexiqr.locale import language_of
+
 #: Languages whose combining marks carry meaning rather than decoration, and so
 #: are matched script-preserving. Arabic is the one v1 commits to; the guarantee
 #: is that its text is not mangled, not that its matching is tuned.
@@ -79,10 +81,8 @@ def _strips_diacritics(locale: str) -> bool:
     it a different letter. Stripping either does not fold Arabic, it corrupts
     it, so Arabic is matched script-preserving: casefolded and otherwise left
     exactly as written.
+
+    Which language a tag names is read the one way lexiqr reads it, so the
+    script policy and the fallback chain never group a locale differently.
     """
-    return _language(locale) not in _SCRIPT_PRESERVING_LANGUAGES
-
-
-def _language(locale: str) -> str:
-    """The language subtag of a BCP 47 tag — `ar` for `ar-EG`."""
-    return locale.split("-")[0].casefold()
+    return language_of(locale) not in _SCRIPT_PRESERVING_LANGUAGES

@@ -22,10 +22,10 @@ import pytest
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import ValidationError as SchemaValidationError
 
+from conftest import REPO_ROOT
 from lexiqr import EntityResolver
 from lexiqr import ValidationError as CoreValidationError
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
 SCHEMA_PATH = REPO_ROOT / "schema" / "lexicon.v1.schema.json"
 SEMANTIC_CORPUS = REPO_ROOT / "schema" / "fixtures" / "semantic"
 DIVERGENCE_DOC = REPO_ROOT / "docs" / "lexicon-semantic-checks.md"

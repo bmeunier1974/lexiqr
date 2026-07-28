@@ -6,9 +6,8 @@ trusted-publisher setup. This guards that those items stay written down and the
 checklist stays discoverable from CONTRIBUTING.
 """
 
-from pathlib import Path
+from conftest import REPO_ROOT
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
 RELEASING = REPO_ROOT / "RELEASING.md"
 CONTRIBUTING = REPO_ROOT / "CONTRIBUTING.md"
 

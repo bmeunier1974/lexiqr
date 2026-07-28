@@ -90,11 +90,47 @@ resolved via: de-DE
 
 The `fuzzy` keyword — accepted by `EntityResolver(...)`, `from_file`, and `from_dict`, defaulting to `True` — is public, semver-governed API; pass `fuzzy=False` for exact-only behaviour.
 
+## Validating a lexicon on its own
+
+Validation *is* construction: `Lexicon.from_file` (and `from_dict`) either returns
+a lexicon lexiqr can trust or raises `ValidationError` naming the entity, locale,
+and field at fault. A tenant's file can therefore be checked on the way in — at
+deploy time, in an upload handler, in your own tests — without building a
+throwaway resolver to find out whether it is valid:
+
+<!-- quickstart:python -->
+```python
+from lexiqr import Lexicon, ValidationError
+
+try:
+    lexicon = Lexicon.from_file("lexicon.json")
+except ValidationError as invalid:
+    print(f"rejected: {invalid}")
+else:
+    print(f"valid: {sorted(lexicon.entities)} in {lexicon.default_locale}")
+```
+
+<!-- quickstart:expected -->
+```text
+valid: ['product'] in de-DE
+```
+
+A `Lexicon` you already hold goes straight into a resolver —
+`EntityResolver(lexicon)` — so nothing is parsed or validated twice.
+
+A file that is not JSON at all raises `MalformedDocumentError`. It *is* a
+`ValidationError`, so the `except` above already covers it; catch it by name only
+when you need to tell "that file is not a lexicon document" from "that lexicon
+says the wrong thing" — the distinction the `lexiqr` CLI turns into its two exit
+codes.
+
 ## Input limits
 
-`transform()` accepts a prompt of at most **10,000 characters** (Unicode code points). A prompt over that limit raises `ValidationError` — the same structured error every other lexiqr failure raises — before any matching work happens, so a pasted document is rejected cheaply rather than taking a request thread with it. Reject or truncate upstream if your callers can paste arbitrary text.
+`transform()` accepts a prompt of at most **10,000 characters** (Unicode code points), exported as `MAX_PROMPT_LENGTH`. A prompt over that limit raises `ValidationError` — the same structured error every other lexiqr failure raises — before any matching work happens, so a pasted document is rejected cheaply rather than taking a request thread with it. Reject or truncate upstream if your callers can paste arbitrary text.
 
-This limit is a fixed part of the contract, not a per-call argument or a configuration knob: one number to reason about. Changing it is a semver-visible change.
+A single surface form in a lexicon is bounded too: at most **128 characters**, exported as `MAX_SURFACE_FORM_LENGTH`, enforced when the lexicon is loaded rather than when a prompt is matched (see [docs/lexicon-semantic-checks.md](docs/lexicon-semantic-checks.md)). Code that generates labels should size them against that constant rather than against a copy of the number.
+
+Both limits are fixed parts of the contract, not per-call arguments or configuration knobs: two numbers to reason about. Changing either is a semver-visible change.
 
 ## Canonical report serialization
 
@@ -130,12 +166,19 @@ that surface is named explicitly. Semver governs:
 - **The public API** — everything exported from the `lexiqr` package:
   `EntityResolver` and its `from_file` / `from_dict` / `transform` methods,
   including the `fuzzy` keyword.
+- **The lexicon model** — `Lexicon`, the type `EntityResolver` takes, with its
+  validating `from_file` / `from_dict` constructors, and `SurfaceForms`, the
+  shape it holds per entity and locale.
 - **The structured error types** — `ValidationError` and its coordinates
-  (`canonical_id`, `locale`, `field`), which the CLI renders verbatim.
+  (`canonical_id`, `locale`, `field`), which the CLI renders verbatim, and
+  `MalformedDocumentError`, the `ValidationError` subclass raised when a file is
+  not JSON at all.
 - **The match report types** — `MatchReport`, `EntityMatch`, and `ScoreTier`,
   and the fields a caller reads off them (span, tier, correction).
 - **The canonical report serialization** — the byte-level shape produced by
   `serialize_report` and consumed by `deserialize_report`.
+- **The two documented limits** — `MAX_PROMPT_LENGTH` and
+  `MAX_SURFACE_FORM_LENGTH`, whose values are part of the contract.
 
 A breaking change to any of these is a major-version change. Everything else —
 internal modules, private helpers, log wording — can change in a patch. Read the

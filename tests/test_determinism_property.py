@@ -20,6 +20,7 @@ import pytest
 from hypothesis import find, given, settings
 from hypothesis import strategies as st
 
+from conftest import lexicon_document
 from lexiqr import EntityResolver, MatchReport, ValidationError, serialize_report
 
 _WORD = st.text(alphabet=string.ascii_lowercase, min_size=3, max_size=8)
@@ -66,11 +67,9 @@ def lexicon_and_prompt(draw: st.DrawFn) -> tuple[dict[str, Any], str]:
             forms["alternates"] = alternates
         entities[f"e{index:03d}"] = {"locales": {locale: forms}}
 
-    document = {
-        "schemaVersion": "1",
-        "defaultLocale": draw(st.sampled_from(_LOCALES)),
-        "entities": entities,
-    }
+    document = lexicon_document(
+        default_locale=draw(st.sampled_from(_LOCALES)), entities=entities
+    )
 
     lexicon_words = [
         value

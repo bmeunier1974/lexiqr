@@ -12,9 +12,8 @@ import time
 
 import pytest
 
+from conftest import FLOOFF_LEXICON
 from lexiqr import EntityResolver, MatchReport, ValidationError
-
-FIXTURE = "examples/flooff.lexicon.json"
 
 #: A ceiling generous enough that only a genuine hang trips it — this is a
 #: liveness check, not a performance measurement. Adversarial inputs here
@@ -25,7 +24,7 @@ _HANG_CEILING_SECONDS = 2.0
 @pytest.fixture(params=[True, False], ids=["fuzzy-on", "fuzzy-off"])
 def resolver(request: pytest.FixtureRequest) -> EntityResolver:
     """Both configurations — the guarantee must hold identically for each."""
-    return EntityResolver.from_file(FIXTURE, fuzzy=request.param)
+    return EntityResolver.from_file(FLOOFF_LEXICON, fuzzy=request.param)
 
 
 def spans_are_valid(report: MatchReport) -> bool:

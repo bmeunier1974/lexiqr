@@ -5,11 +5,10 @@ ordering rules something they are entitled to read rather than reverse-engineer
 from the scan — and something that must not quietly drift away from the code.
 """
 
-from pathlib import Path
-
 import pytest
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+from conftest import REPO_ROOT
+
 RULES_DOC = REPO_ROOT / "docs" / "matching-rules.md"
 
 

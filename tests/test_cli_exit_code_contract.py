@@ -7,8 +7,7 @@ returns. This test ties the author-facing doc to the real exit codes: change a
 code without updating the doc, and it fails.
 """
 
-from pathlib import Path
-
+from conftest import REPO_ROOT
 from lexiqr.cli import (
     EXIT_CLI_ERROR,
     EXIT_INVALID_LEXICON,
@@ -16,7 +15,7 @@ from lexiqr.cli import (
     EXIT_OK,
 )
 
-DOC = Path(__file__).resolve().parent.parent / "docs" / "lexicon-authoring.md"
+DOC = REPO_ROOT / "docs" / "lexicon-authoring.md"
 USAGE_EXIT_CODE = 2  # argparse's own conventional code
 
 

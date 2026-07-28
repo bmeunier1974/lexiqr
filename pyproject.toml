@@ -1,6 +1,6 @@
 [project]
 name = "lexiqr"
-version = "1.0.0"
+version = "1.1.0"
 description = "Deterministic, tenant-scoped resolution of company jargon to canonical entities."
 readme = "README.md"
 requires-python = ">=3.10"

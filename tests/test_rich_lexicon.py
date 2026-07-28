@@ -6,14 +6,13 @@ integrating developer can actually observe.
 """
 
 import json
-from pathlib import Path
 from typing import Any
 
 import pytest
 
+from conftest import REPO_ROOT
 from lexiqr import EntityResolver
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
 ACME = REPO_ROOT / "schema" / "fixtures" / "valid" / "acme-multilingual.lexicon.json"
 
 

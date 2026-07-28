@@ -8,9 +8,9 @@ its contract and nothing narrower.
 """
 
 import json
-from pathlib import Path
 
 import lexiqr
+from conftest import FLOOFF_LEXICON
 from lexiqr import (
     EntityMatch,
     EntityResolver,
@@ -18,10 +18,6 @@ from lexiqr import (
     ScoreTier,
     deserialize_report,
     serialize_report,
-)
-
-FIXTURE_PATH = (
-    Path(__file__).resolve().parent.parent / "examples" / "flooff.lexicon.json"
 )
 
 
@@ -120,7 +116,7 @@ def test_a_report_with_a_correction_round_trips() -> None:
 
 
 def test_two_transform_calls_with_the_same_inputs_serialize_identically() -> None:
-    resolver = EntityResolver.from_file(FIXTURE_PATH)
+    resolver = EntityResolver.from_file(FLOOFF_LEXICON)
 
     first = serialize_report(resolver.transform("wo ist flooff", "de-DE"))
     second = serialize_report(resolver.transform("wo ist flooff", "de-DE"))

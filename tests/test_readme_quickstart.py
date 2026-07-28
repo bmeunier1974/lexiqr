@@ -22,7 +22,8 @@ from pathlib import Path
 import pytest
 from quickstart_extractor import RunnableUnit, extract_quickstart, materialize_files
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+from conftest import REPO_ROOT
+
 README = REPO_ROOT / "README.md"
 
 

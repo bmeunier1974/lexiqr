@@ -1,27 +1,56 @@
-"""The pure validation-error renderer — typed error(s) in, string out.
+"""The pure load-outcome renderer — a typed outcome in, string out.
 
-This module owns the whole presentation policy for `lexiqr validate`: how a
-lexicon with no errors is confirmed, how multiple errors are ordered and
-grouped, and how each fault is laid out. It never touches argv, stdout, or the
-filesystem, so it is unit-tested by handing it directly-constructed values.
+This module owns the whole presentation policy for loading a lexicon: how a
+lexicon with no errors is confirmed, how the shell's own CLI-level failures are
+stamped, and how multiple lexicon faults are ordered, grouped and laid out. It
+never touches argv, stdout, or the filesystem, so it is unit-tested by handing
+it directly-constructed values.
 
-Core's `ValidationError` message is shown verbatim — its substance is the same
-error an integrating developer sees at load time (C14), and the shell must not
-re-word or re-classify it. What this module adds is layout: a header that names
-the source and counts the faults, deterministic ordering, and one bullet per
-error.
+Core's messages are shown verbatim — their substance is the same error an
+integrating developer sees at load time (C14), and the shell must not re-word or
+re-classify them, nor keep a second copy of one. What this module adds is
+presentation: the ``lexiqr:`` prefix that marks a line as the shell's own
+diagnostic, and, for lexicon faults, a header that names the source and counts
+the faults, deterministic ordering, and one bullet per error.
 """
 
 from __future__ import annotations
 
 from collections.abc import Sequence
 
-from lexiqr import ValidationError
+from lexiqr import MalformedDocumentError, ValidationError
+
+#: Stamped on every CLI-level diagnostic, so a line captured out of a build log
+#: still names what wrote it. Prefixing is the whole of the shell's contribution
+#: to those messages.
+_PREFIX = "lexiqr"
 
 
 def render_valid_lexicon(source: str) -> str:
     """Confirm, unambiguously, that `source` loaded as a valid lexicon."""
     return f"{source}: valid lexicon."
+
+
+def render_unreadable_source(source: str, unreadable: OSError) -> str:
+    """Report that the path the shell was handed cannot be read at all.
+
+    The shell's own failure — the author's path is wrong, not their lexicon — so
+    it is phrased so it cannot be mistaken for one, in the operating system's own
+    words about the file.
+    """
+    reason = unreadable.strerror or str(unreadable)
+    return f"{_PREFIX}: cannot read {source}: {reason}"
+
+
+def render_malformed_document(malformed: MalformedDocumentError) -> str:
+    """Report that the file is not JSON, in the words core already wrote.
+
+    The sentence — which file, what was expected, at which line and column — is
+    core's, carried through untouched, because the lexicon author and the
+    integrating developer must read the same one. The prefix is all the shell
+    adds.
+    """
+    return f"{_PREFIX}: {malformed.message}"
 
 
 def render_validation_errors(source: str, errors: Sequence[ValidationError]) -> str:

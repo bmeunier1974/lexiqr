@@ -5,14 +5,15 @@ yet declare them for a sibling variant of the same language — `de-DE` forms a
 `de-AT` prompt would match perfectly. The fallback chain is the ordered list of
 locales to try for a given request, and this module is the whole policy that
 builds it: the exact locale first, then that language's other variants the
-lexicon actually contains.
+lexicon actually contains, then the declared default.
 
 It is pure and I/O-free on purpose. The policy can change — later variants of
-lexiqr add a declared-default backstop and caller-supplied overrides — without
-any of that reasoning leaking into the matching pipeline, and without a test of
-the policy having to run a scan. BCP 47 tags are treated as opaque identifiers:
-compared case-insensitively, with only the leading language subtag extracted to
-group variants. No locale database, no canonicalization, no language detection.
+lexiqr add caller-supplied overrides on top of the declared-default backstop —
+without any of that reasoning leaking into the matching pipeline, and without a
+test of the policy having to run a scan. It is also only policy: what a tag is,
+when two tags name one locale, and which language a tag belongs to are questions
+`lexiqr.locale` answers, so the order below reads as the rule it encodes rather
+than as string handling.
 """
 
 from __future__ import annotations
@@ -20,6 +21,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 
 from lexiqr.errors import ValidationError
+from lexiqr.locale import DeclaredLocales, deduplicate
 
 
 def build_chain(
@@ -49,28 +51,14 @@ def build_chain(
     Tags in the returned chain carry the lexicon's own spelling, so a caller can
     report which locale answered in the casing the lexicon author wrote.
     """
-    # Case-insensitive lookup that remembers the lexicon's own spelling, so a
-    # match reports the locale as the author wrote it, not as the caller typed.
-    by_fold: dict[str, str] = {}
-    for locale in available:
-        by_fold.setdefault(locale.casefold(), locale)
-
-    language = _language_subtag(requested)
-    chain: list[str] = []
-    seen: set[str] = set()
-
-    def append(locale: str | None) -> None:
-        if locale is not None and locale.casefold() not in seen:
-            seen.add(locale.casefold())
-            chain.append(locale)
-
-    append(by_fold.get(requested.casefold()))
-    for sibling in sorted(by_fold.values(), key=str.casefold):
-        if _language_subtag(sibling) == language:
-            append(sibling)
-    append(by_fold.get(default_locale.casefold()))
-
-    return tuple(chain)
+    declared = DeclaredLocales(available)
+    return deduplicate(
+        [
+            declared.spelling_of(requested),
+            *declared.variants_of(requested),
+            declared.spelling_of(default_locale),
+        ]
+    )
 
 
 def resolve_explicit_chain(
@@ -86,17 +74,8 @@ def resolve_explicit_chain(
     empty once absent locales are dropped, could never resolve any prompt, so it
     is rejected here — at construction — rather than left to fail per request.
     """
-    by_fold: dict[str, str] = {}
-    for locale in available:
-        by_fold.setdefault(locale.casefold(), locale)
-
-    resolved: list[str] = []
-    seen: set[str] = set()
-    for locale in chain:
-        present = by_fold.get(locale.casefold())
-        if present is not None and present.casefold() not in seen:
-            seen.add(present.casefold())
-            resolved.append(present)
+    declared = DeclaredLocales(available)
+    resolved = deduplicate(declared.spelling_of(tag) for tag in chain)
 
     if not resolved:
         raise ValidationError(
@@ -106,9 +85,4 @@ def resolve_explicit_chain(
             "lexicon actually declares.",
             field="fallback_chain",
         )
-    return tuple(resolved)
-
-
-def _language_subtag(locale: str) -> str:
-    """The leading BCP 47 language subtag, casefolded — `de` for `de-AT`."""
-    return locale.split("-", 1)[0].casefold()
+    return resolved

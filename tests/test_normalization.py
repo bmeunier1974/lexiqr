@@ -6,26 +6,14 @@ stage that has to hand back a way home. Every assertion here slices
 given, because that is what an integrating developer does with a match.
 """
 
-from typing import Any
-
+from conftest import lexicon_document
 from lexiqr import EntityResolver
 
 
-def lexicon(locale: str, singular: str, **preferred: str) -> dict[str, Any]:
-    """A one-entity lexicon, so a test can state exactly the surface form it means."""
-    return {
-        "schemaVersion": "1",
-        "defaultLocale": locale,
-        "entities": {
-            "episode": {
-                "locales": {locale: {"preferred": {"singular": singular, **preferred}}}
-            }
-        },
-    }
-
-
 def test_an_accented_prompt_matches_a_surface_form_written_without_accents() -> None:
-    resolver = EntityResolver.from_dict(lexicon("fr-FR", "episodes"))
+    resolver = EntityResolver.from_dict(
+        lexicon_document("fr-FR", episode={"preferred": {"singular": "episodes"}})
+    )
 
     report = resolver.transform("combien d'épisodes", "fr-FR")
 
@@ -37,7 +25,9 @@ def test_an_accented_prompt_matches_a_surface_form_written_without_accents() -> 
 def test_an_unaccented_prompt_matches_a_surface_form_a_tenant_wrote_with_accents() -> (
     None
 ):
-    resolver = EntityResolver.from_dict(lexicon("fr-FR", "épisodes"))
+    resolver = EntityResolver.from_dict(
+        lexicon_document("fr-FR", episode={"preferred": {"singular": "épisodes"}})
+    )
 
     report = resolver.transform("combien d'episodes", "fr-FR")
 
@@ -47,7 +37,9 @@ def test_an_unaccented_prompt_matches_a_surface_form_a_tenant_wrote_with_accents
 
 
 def test_a_capitalised_prompt_matches_a_lowercase_surface_form() -> None:
-    resolver = EntityResolver.from_dict(lexicon("fr-FR", "épisodes"))
+    resolver = EntityResolver.from_dict(
+        lexicon_document("fr-FR", episode={"preferred": {"singular": "épisodes"}})
+    )
 
     report = resolver.transform("Épisodes disponibles", "fr-FR")
 
@@ -58,7 +50,9 @@ def test_a_capitalised_prompt_matches_a_lowercase_surface_form() -> None:
 
 def test_a_span_survives_a_fold_that_lengthens_the_text() -> None:
     """`ß` casefolds to `ss`, so every offset after it drifts by one."""
-    resolver = EntityResolver.from_dict(lexicon("de-DE", "strasse"))
+    resolver = EntityResolver.from_dict(
+        lexicon_document("de-DE", episode={"preferred": {"singular": "strasse"}})
+    )
 
     report = resolver.transform("die Straße und die Gasse", "de-DE")
 
@@ -69,7 +63,9 @@ def test_a_span_survives_a_fold_that_lengthens_the_text() -> None:
 
 def test_a_span_after_a_stripped_accent_is_not_shifted_by_the_stripping() -> None:
     """A decomposed accent is dropped, so offsets after it drift the other way."""
-    resolver = EntityResolver.from_dict(lexicon("fr-FR", "diffuses"))
+    resolver = EntityResolver.from_dict(
+        lexicon_document("fr-FR", episode={"preferred": {"singular": "diffuses"}})
+    )
 
     report = resolver.transform("épisodes diffusés hier", "fr-FR")
 
@@ -92,15 +88,31 @@ def test_arabic_keeps_its_diacritics_through_normalisation() -> None:
 
 def test_arabic_letters_that_differ_only_by_hamza_are_not_conflated() -> None:
     """`أ` decomposes to `ا` + hamza; stripping the hamza invents a match."""
-    resolver = EntityResolver.from_dict(lexicon("ar-EG", "اسم"))
+    resolver = EntityResolver.from_dict(
+        lexicon_document("ar-EG", episode={"preferred": {"singular": "اسم"}})
+    )
 
     report = resolver.transform("أسم الحلقة", "ar-EG")
 
     assert report.matches == ()
 
 
+def test_the_script_policy_reads_the_language_subtag_whatever_its_casing() -> None:
+    """`AR-eg` names the same language as `ar-EG`: the subtag is folded first."""
+    resolver = EntityResolver.from_dict(
+        lexicon_document("AR-eg", episode={"preferred": {"singular": "اسم"}})
+    )
+
+    assert resolver.transform("أسم الحلقة", "AR-eg").matches == ()
+    assert resolver.transform("اسم الحلقة", "AR-eg").matches != ()
+
+
 def test_an_arabic_prompt_resolves_with_a_span_that_slices_the_original() -> None:
-    resolver = EntityResolver.from_dict(lexicon("ar-EG", "منتج", plural="منتجات"))
+    resolver = EntityResolver.from_dict(
+        lexicon_document(
+            "ar-EG", episode={"preferred": {"singular": "منتج", "plural": "منتجات"}}
+        )
+    )
 
     report = resolver.transform("أين منتجات الشركة", "ar-EG")
 
@@ -110,7 +122,9 @@ def test_an_arabic_prompt_resolves_with_a_span_that_slices_the_original() -> Non
 
 
 def test_an_arabic_prompt_with_harakat_matches_a_form_written_the_same_way() -> None:
-    resolver = EntityResolver.from_dict(lexicon("ar-EG", "مُنتَج"))
+    resolver = EntityResolver.from_dict(
+        lexicon_document("ar-EG", episode={"preferred": {"singular": "مُنتَج"}})
+    )
 
     report = resolver.transform("أين مُنتَج الشركة", "ar-EG")
 

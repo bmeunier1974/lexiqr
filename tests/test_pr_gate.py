@@ -14,7 +14,8 @@ from typing import Any
 import pytest
 import yaml
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+from conftest import REPO_ROOT
+
 CI_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "ci.yml"
 PYPROJECT = REPO_ROOT / "pyproject.toml"
 

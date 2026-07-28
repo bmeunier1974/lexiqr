@@ -6,19 +6,12 @@ new field is a breaking change. So the full field set lands here, and the ones
 this epic can already answer are mandatory rather than optional.
 """
 
-from pathlib import Path
-
 import pytest
 
+from conftest import REPO_ROOT
 from lexiqr import EntityMatch, EntityResolver, ScoreTier
 
-ACME = (
-    Path(__file__).resolve().parent.parent
-    / "schema"
-    / "fixtures"
-    / "valid"
-    / "acme-multilingual.lexicon.json"
-)
+ACME = REPO_ROOT / "schema" / "fixtures" / "valid" / "acme-multilingual.lexicon.json"
 
 
 @pytest.fixture

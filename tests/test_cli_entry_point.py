@@ -4,15 +4,11 @@ import ast
 import shutil
 import subprocess
 import sys
-from pathlib import Path
 
 import pytest
 
 import lexiqr
-
-FIXTURE_PATH = (
-    Path(__file__).resolve().parent.parent / "examples" / "flooff.lexicon.json"
-)
+from conftest import FLOOFF_LEXICON, REPO_ROOT
 
 
 def run_cli(*args: str) -> subprocess.CompletedProcess[str]:
@@ -43,7 +39,7 @@ def test_lexiqr_is_installed_as_a_console_entry_point() -> None:
 
 
 def test_lexiqr_try_prints_the_match_report_and_exits_zero() -> None:
-    result = run_cli("try", str(FIXTURE_PATH), "--locale", "de-DE", "wo ist flooff")
+    result = run_cli("try", str(FLOOFF_LEXICON), "--locale", "de-DE", "wo ist flooff")
 
     assert result.returncode == 0
     assert "product" in result.stdout
@@ -59,7 +55,7 @@ def test_the_cli_reaches_only_for_lexiqrs_documented_public_api() -> None:
     reach into a private core submodule (``from lexiqr.matcher import ...``),
     fails here on the first offence rather than at review time.
     """
-    cli_package = Path(__file__).resolve().parent.parent / "src" / "lexiqr" / "cli"
+    cli_package = REPO_ROOT / "src" / "lexiqr" / "cli"
     public_api = set(lexiqr.__all__)
 
     violations: list[str] = []
@@ -87,5 +83,41 @@ def test_the_cli_reaches_only_for_lexiqrs_documented_public_api() -> None:
                         continue
                     if name.startswith("lexiqr"):
                         violations.append(f"{module.name}: import {name}")
+
+    assert violations == []
+
+
+def test_the_cli_reads_and_parses_nothing_of_its_own() -> None:
+    """ADR 0002 read the other way: loading a lexicon is core's job, not the shell's.
+
+    A shell that opened the file and parsed the JSON itself would own a second
+    copy of "that file is not valid JSON" — wording a lexicon author could see
+    and an integrating developer never would, free to drift from core's. So the
+    shell reaches for no reader and no parser: statically, no CLI module imports
+    `json` or `pathlib`, and none calls a read or a parse.
+    """
+    cli_package = REPO_ROOT / "src" / "lexiqr" / "cli"
+    loading_modules = {"json", "pathlib", "io"}
+    loading_calls = {"open", "read_text", "read_bytes", "load", "loads"}
+
+    violations: list[str] = []
+    for module in sorted(cli_package.rglob("*.py")):
+        tree = ast.parse(module.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                violations += [
+                    f"{module.name}: import {alias.name}"
+                    for alias in node.names
+                    if alias.name.split(".")[0] in loading_modules
+                ]
+            elif isinstance(node, ast.ImportFrom):
+                if (node.module or "").split(".")[0] in loading_modules:
+                    violations.append(f"{module.name}: from {node.module} import ...")
+            elif isinstance(node, ast.Call):
+                called = node.func
+                if isinstance(called, ast.Attribute) and called.attr in loading_calls:
+                    violations.append(f"{module.name}: .{called.attr}(...)")
+                elif isinstance(called, ast.Name) and called.id in loading_calls:
+                    violations.append(f"{module.name}: {called.id}(...)")
 
     assert violations == []

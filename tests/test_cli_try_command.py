@@ -14,6 +14,8 @@ from typing import Any
 
 import pytest
 
+from conftest import FLOOFF_LEXICON, flooff_document, lexicon_document
+from lexiqr import Lexicon
 from lexiqr.cli import (
     EXIT_CLI_ERROR,
     EXIT_INVALID_LEXICON,
@@ -21,13 +23,6 @@ from lexiqr.cli import (
     EXIT_OK,
     main,
 )
-
-REPO_ROOT = Path(__file__).resolve().parent.parent
-FLOOFF = REPO_ROOT / "examples" / "flooff.lexicon.json"
-
-
-def valid_document() -> Any:
-    return json.loads(FLOOFF.read_text(encoding="utf-8"))
 
 
 def write(tmp_path: Path, document: Any) -> Path:
@@ -39,7 +34,7 @@ def write(tmp_path: Path, document: Any) -> Path:
 def test_try_prints_the_match_report_on_stdout_and_exits_zero(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    code = main(["try", str(FLOOFF), "--locale", "de-DE", "wo ist flooff"])
+    code = main(["try", str(FLOOFF_LEXICON), "--locale", "de-DE", "wo ist flooff"])
 
     captured = capsys.readouterr()
     assert code == EXIT_OK
@@ -51,7 +46,7 @@ def test_try_prints_the_match_report_on_stdout_and_exits_zero(
 def test_try_on_a_prompt_that_matches_nothing_says_so_and_exits_nonzero(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    code = main(["try", str(FLOOFF), "--locale", "de-DE", "nichts hier"])
+    code = main(["try", str(FLOOFF_LEXICON), "--locale", "de-DE", "nichts hier"])
 
     captured = capsys.readouterr()
     assert code == EXIT_NO_MATCH
@@ -63,7 +58,7 @@ def test_try_on_a_prompt_that_matches_nothing_says_so_and_exits_nonzero(
 def test_try_on_an_invalid_lexicon_renders_validation_errors_not_a_match_failure(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    document = valid_document()
+    document = flooff_document()
     del document["entities"]["product"]["locales"]["de-DE"]["preferred"]["singular"]
     path = write(tmp_path, document)
 
@@ -78,15 +73,62 @@ def test_try_on_an_invalid_lexicon_renders_validation_errors_not_a_match_failure
 def test_the_load_failure_code_is_distinct_from_the_no_match_code(
     tmp_path: Path,
 ) -> None:
-    document = valid_document()
+    document = flooff_document()
     document["schemaVersion"] = "99"
     invalid = main(["try", str(write(tmp_path, document)), "--locale", "de-DE", "x"])
 
-    no_match = main(["try", str(FLOOFF), "--locale", "de-DE", "nichts"])
+    no_match = main(["try", str(FLOOFF_LEXICON), "--locale", "de-DE", "nichts"])
 
     assert invalid != no_match
     assert invalid == EXIT_INVALID_LEXICON
     assert no_match == EXIT_NO_MATCH
+
+
+def test_try_loads_the_lexicon_exactly_once_per_invocation(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """One invocation, one load — counted at the public seam the shell loads through.
+
+    A shell that validated the file and then loaded it again to match would give
+    the two passes two different readings of the same path, so "valid" and
+    "matched" could describe different lexicons within one run.
+    """
+    loads: list[str] = []
+    load = Lexicon.from_file
+
+    def counted(path: str) -> Lexicon:
+        loads.append(path)
+        return load(path)
+
+    monkeypatch.setattr(Lexicon, "from_file", counted)
+
+    code = main(["try", str(FLOOFF_LEXICON), "--locale", "de-DE", "wo ist flooff"])
+
+    assert code == EXIT_OK
+    assert "flooff" in capsys.readouterr().out
+    assert loads == [str(FLOOFF_LEXICON)]
+
+
+def test_try_matches_against_the_very_lexicon_it_validated(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Matching reuses the loaded lexicon rather than reaching for the file again.
+
+    The seam is made to hand back a lexicon the file does not contain: if the
+    report follows that lexicon, matching ran against the object validation
+    produced — the two cannot disagree.
+    """
+    substitute = Lexicon.from_dict(
+        lexicon_document("de-DE", widget={"preferred": {"singular": "zork"}})
+    )
+    monkeypatch.setattr(Lexicon, "from_file", lambda path: substitute)
+
+    code = main(["try", str(FLOOFF_LEXICON), "--locale", "de-DE", "wo ist zork"])
+
+    captured = capsys.readouterr()
+    assert code == EXIT_OK
+    assert "widget" in captured.out
+    assert "product" not in captured.out
 
 
 def test_try_on_a_missing_file_is_a_cli_level_failure(

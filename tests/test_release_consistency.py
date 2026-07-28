@@ -11,7 +11,6 @@ by the person it was built to protect.
 
 import subprocess
 import sys
-from pathlib import Path
 
 from release_consistency import (
     ChangelogEntry,
@@ -19,6 +18,8 @@ from release_consistency import (
     parse_top_entry,
     read_project_version,
 )
+
+from conftest import REPO_ROOT
 
 
 def test_full_agreement_is_ok() -> None:
@@ -174,7 +175,7 @@ def test_read_project_version_finds_the_project_table_version() -> None:
 
 # --- the script's I/O glue, exercised end to end against the real repo ---
 
-_SCRIPT = Path(__file__).resolve().parent.parent / "scripts" / "release_consistency.py"
+_SCRIPT = REPO_ROOT / "scripts" / "release_consistency.py"
 
 
 def test_script_reports_a_version_mismatch_against_the_real_repo() -> None:

@@ -8,6 +8,14 @@ this error verbatim, so precision here is precision everywhere.
 
 Coordinates a given failure does not have are `None`: a bad `schemaVersion` is
 a fault of the document as a whole, not of any one entity.
+
+`MalformedDocumentError` is the one failure that has no coordinates to have: a
+file that is not JSON never became a document, so nothing in it can be pointed
+at. It is a `ValidationError` — a caller who only wants "this lexicon cannot be
+loaded" writes one `except` — and a distinct type, so a caller who must tell
+"your path points at something that is not a lexicon file" from "your lexicon
+says the wrong thing" can. The CLI is that caller: the distinction is what its
+two exit codes are made of.
 """
 
 from __future__ import annotations
@@ -33,3 +41,13 @@ class ValidationError(Exception):
         self.locale = locale
         self.field = field
         super().__init__(message)
+
+
+class MalformedDocumentError(ValidationError):
+    """The file is not JSON, so there is no lexicon document to validate.
+
+    Raised only by the file-loading path — `Lexicon.from_file` and the
+    constructors built on it — and never for a document that parsed: a document
+    lexiqr could read but had to reject is an ordinary `ValidationError` naming
+    the field at fault.
+    """

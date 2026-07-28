@@ -6,33 +6,17 @@ type marker dropped, the console script undeclared — is the kind of thing that
 looks fine locally and is only discovered once it is published and someone's
 `pip install` is missing a piece. So the built artifact is inspected here: build
 the wheel, open it, and assert it carries what an integrating developer needs.
+
+The artifact itself comes from the session-scoped `wheel` fixture in conftest,
+so the build happens once for the whole run rather than once per file that
+inspects it.
 """
 
 import email
 import email.message
 import re
-import subprocess
 import zipfile
 from pathlib import Path
-
-import pytest
-
-REPO_ROOT = Path(__file__).resolve().parent.parent
-
-
-@pytest.fixture(scope="module")
-def wheel(tmp_path_factory: pytest.TempPathFactory) -> Path:
-    """The distribution a consumer would actually install."""
-    out = tmp_path_factory.mktemp("dist")
-    subprocess.run(
-        ["uv", "build", "--wheel", "--out-dir", str(out)],
-        cwd=REPO_ROOT,
-        check=True,
-        capture_output=True,
-    )
-    built = list(out.glob("*.whl"))
-    assert len(built) == 1, built
-    return built[0]
 
 
 def test_the_wheel_bundles_the_versioned_json_schema(wheel: Path) -> None:

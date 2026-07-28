@@ -8,13 +8,13 @@ was green" and "the package installs and works" are made the same statement by a
 post-publish job that installs from PyPI and reproduces the flooff match.
 """
 
-from pathlib import Path
 from typing import Any, cast
 
 import pytest
 import yaml
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+from conftest import REPO_ROOT
+
 RELEASE_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "release.yml"
 
 

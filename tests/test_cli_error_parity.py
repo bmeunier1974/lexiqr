@@ -22,10 +22,10 @@ from pathlib import Path
 
 import pytest
 
-from lexiqr import EntityResolver, ValidationError
+from conftest import REPO_ROOT
+from lexiqr import EntityResolver, Lexicon, ValidationError
 from lexiqr.cli import EXIT_INVALID_LEXICON, main
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
 INVALID_CORPUS = REPO_ROOT / "schema" / "fixtures" / "invalid"
 
 
@@ -70,6 +70,31 @@ def test_validate_output_carries_the_same_facts_as_the_load_time_error(
             f"{fixture.stem}: the {coordinate} {value!r} the loader faults is "
             f"absent from what `validate` rendered"
         )
+
+
+def test_a_file_that_is_not_json_is_reported_in_the_librarys_own_words(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Parity covers the file itself, not only the lexicon inside it.
+
+    "Not valid JSON" is one sentence, written once, in core's loading path. What
+    the author reads is that sentence under the shell's prefix — nothing
+    re-worded, nothing re-classified — so it cannot drift from what an
+    integrating developer catches.
+    """
+    path = tmp_path / "truncated.lexicon.json"
+    path.write_text('{"schemaVersion": "1",', encoding="utf-8")
+
+    with pytest.raises(ValidationError) as raised:
+        Lexicon.from_file(str(path))
+    library_wording = raised.value.message
+
+    code = main(["validate", str(path)])
+    rendered = capsys.readouterr().err
+
+    # A CLI-level failure — the file never became a lexicon to be invalid.
+    assert code != EXIT_INVALID_LEXICON
+    assert rendered.rstrip("\n") == f"lexiqr: {library_wording}"
 
 
 def test_the_parity_test_actually_drives_the_shared_invalid_corpus() -> None:

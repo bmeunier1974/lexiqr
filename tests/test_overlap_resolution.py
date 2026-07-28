@@ -5,25 +5,13 @@ report is relying on them, so every one of them is asserted through the public
 API rather than left to whatever the scan happened to emit first.
 """
 
-from typing import Any
-
+from conftest import lexicon_document
 from lexiqr import EntityResolver, ScoreTier
-
-
-def lexicon(locale: str, **entities: dict[str, Any]) -> dict[str, Any]:
-    return {
-        "schemaVersion": "1",
-        "defaultLocale": locale,
-        "entities": {
-            canonical_id: {"locales": {locale: forms}}
-            for canonical_id, forms in entities.items()
-        },
-    }
 
 
 def test_a_multi_word_label_is_not_shredded_into_the_labels_inside_it() -> None:
     resolver = EntityResolver.from_dict(
-        lexicon(
+        lexicon_document(
             "en-GB",
             ticket={"preferred": {"singular": "ticket"}},
             escalation={"preferred": {"singular": "support ticket"}},
@@ -44,7 +32,7 @@ def test_equal_length_overlaps_are_broken_by_tier() -> None:
     tier is asked before start.
     """
     resolver = EntityResolver.from_dict(
-        lexicon(
+        lexicon_document(
             "en-GB",
             product={"preferred": {"singular": "bb cc"}},
             invoice={"preferred": {"singular": "zz"}, "alternates": ["aa bb"]},
@@ -60,7 +48,7 @@ def test_equal_length_overlaps_are_broken_by_tier() -> None:
 
 def test_an_equal_length_equal_tier_overlap_is_broken_by_the_earlier_start() -> None:
     resolver = EntityResolver.from_dict(
-        lexicon(
+        lexicon_document(
             "en-GB",
             product={"preferred": {"singular": "aa bb"}},
             invoice={"preferred": {"singular": "bb cc"}},
@@ -82,7 +70,7 @@ def test_forms_that_differ_only_by_accent_are_separated_the_same_way_every_time(
     choose between them, so the canonical ID does — identically, every run.
     """
     resolver = EntityResolver.from_dict(
-        lexicon(
+        lexicon_document(
             "fr-FR",
             zebre={"preferred": {"singular": "épisode"}},
             alpaga={"preferred": {"singular": "episode"}},
@@ -97,7 +85,7 @@ def test_forms_that_differ_only_by_accent_are_separated_the_same_way_every_time(
 
 def test_hits_that_do_not_overlap_are_all_kept() -> None:
     resolver = EntityResolver.from_dict(
-        lexicon(
+        lexicon_document(
             "en-GB",
             ticket={"preferred": {"singular": "ticket"}},
             product={"preferred": {"singular": "widget"}},
@@ -112,7 +100,7 @@ def test_hits_that_do_not_overlap_are_all_kept() -> None:
 def test_the_report_is_ordered_by_position_not_by_tier() -> None:
     """A canonical-tier hit early in the prompt still comes first."""
     resolver = EntityResolver.from_dict(
-        lexicon(
+        lexicon_document(
             "en-GB",
             product={"preferred": {"singular": "widget"}},
             invoice={"preferred": {"singular": "bill"}},
@@ -128,25 +116,33 @@ def test_the_report_is_ordered_by_position_not_by_tier() -> None:
 
 
 def test_an_exact_hit_outranks_an_overlapping_fuzzy_hit_even_a_longer_one() -> None:
-    """The one new dimension: kind is asked before span length.
+    """Kind is asked before span length — the one rule pinned from inside.
 
-    A correctly spelled word must never be displaced by a fuzzy guess, so where
-    the two kinds claim overlapping text the exact hit wins outright — even when
-    the fuzzy hit spans more of the prompt.
+    Reaching into the matcher is deliberate here, and it is the only place in
+    the suite that does it. The rule guards a case no lexicon and prompt can
+    produce: the fuzzy pass already skips every word an exact hit covered, so an
+    overlapping pair of the two kinds never reaches the resolver through
+    `transform`. That pre-filter is a cost optimization; this rule is the
+    guarantee — a correctly spelled word is never displaced by a guess — and a
+    guarantee that is only ever exercised by the optimization that makes it
+    unnecessary is untested. So the claims are handed to the resolver directly.
     """
-    from lexiqr.overlaps import Candidate, resolve
+    from lexiqr.index import Hit
+    from lexiqr.matcher import _Claim, _resolve
 
-    exact = Candidate("product", "widget", (4, 10), ScoreTier.CANONICAL, is_fuzzy=False)
-    longer_fuzzy = Candidate(
-        "gadget", "gadgetry", (0, 12), ScoreTier.PREFERRED, is_fuzzy=True
+    exact = _Claim(
+        Hit("product", "widget", (4, 10), ScoreTier.CANONICAL), is_fuzzy=False
+    )
+    longer_fuzzy = _Claim(
+        Hit("gadget", "gadgetry", (0, 12), ScoreTier.PREFERRED), is_fuzzy=True
     )
 
-    assert resolve((longer_fuzzy, exact)) == (exact,)
+    assert _resolve((longer_fuzzy, exact)) == (exact,)
 
 
 def test_a_correctly_spelled_and_a_misspelled_term_both_resolve() -> None:
     resolver = EntityResolver.from_dict(
-        lexicon("en-GB", product={"preferred": {"singular": "widget"}})
+        lexicon_document("en-GB", product={"preferred": {"singular": "widget"}})
     )
 
     report = resolver.transform("a widget beside a widgt", "en-GB")
@@ -159,7 +155,7 @@ def test_a_region_the_exact_scan_claimed_yields_no_fuzzy_candidate() -> None:
     """ "ticket" is one edit from "ticker", but the exact scan already claimed it,
     so tolerance never re-examines the word and no second, fuzzy match appears."""
     resolver = EntityResolver.from_dict(
-        lexicon(
+        lexicon_document(
             "en-GB",
             product={"preferred": {"singular": "ticket"}},
             index={"preferred": {"singular": "ticker"}},
@@ -175,7 +171,7 @@ def test_a_region_the_exact_scan_claimed_yields_no_fuzzy_candidate() -> None:
 
 def test_a_rebuilt_resolver_reports_the_same_thing_as_the_first_one() -> None:
     """Determinism survives a rebuild of the resolver, not just a repeated call."""
-    document = lexicon(
+    document = lexicon_document(
         "en-GB",
         ticket={"preferred": {"singular": "ticket"}},
         escalation={"preferred": {"singular": "support ticket"}},
