@@ -189,4 +189,34 @@ held      the report survived the round trip whole, and serializing it twice gav
           same bytes. A snapshot taken from this is a snapshot that still means
           something later.
 
+--- 12. The same lexicon through `lexiqr validate` and `lexiqr try` [C14, C15] ---
+
+claim     The same file the sections above resolved against runs through both CLI
+          commands, and each command's exit code is a contract a script branches on. A
+          valid lexicon and a resolved prompt exit zero; a valid lexicon whose prompt
+          resolved nothing has its own code, distinct from every way loading can fail.
+invoked   as `python -m lexiqr.cli …` from examples/, so nothing depends on PATH or on
+          the console script. The codes below are read from the CLI's named constants.
+command   lexiqr validate medien.lexicon.json
+output    medien.lexicon.json: valid lexicon.
+exit      0 (EXIT_OK)
+command   lexiqr try medien.lexicon.json --locale de-DE 'wo sind die filme'
+output    prompt: "wo sind die [filme]"
+          resolved via: de-DE
+          1 match:
+          
+            [1] product ← "filme"
+                tier: preferred   locale: de-DE   text: "filme"
+                entry: movie
+                filter: genre=drama|thriller, productType=Movie
+exit      0 (EXIT_OK)
+command   lexiqr try medien.lexicon.json --locale de-DE 'wo ist das wetter'
+output    prompt: "wo ist das wetter"
+          resolved via: de-DE
+          no match
+exit      4 (EXIT_NO_MATCH)
+held      both commands ran against the same document, each printing what a lexicon
+          author sees and returning the code a script reads. The report above is the
+          CLI's own rendering, not this run's — which is why the two look different.
+
 OK: every section held.

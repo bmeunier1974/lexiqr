@@ -37,6 +37,9 @@ it rather than hand-editing:
 from __future__ import annotations
 
 import io
+import os
+import shlex
+import subprocess
 import sys
 import textwrap
 from pathlib import Path
@@ -54,6 +57,7 @@ from lexiqr import (
     deserialize_report,
     serialize_report,
 )
+from lexiqr.cli import EXIT_NO_MATCH, EXIT_OK
 
 #: The tenant lexicon every section resolves against, found relative to this
 #: file so the working directory is irrelevant.
@@ -180,6 +184,17 @@ def abbreviated(text: str) -> str:
     """
     room = WIDTH - LABEL_WIDTH
     return text if len(text) <= room else f"{text[: room - 1]}…"
+
+
+def emit_lines(label: str, text: str) -> None:
+    """Captured multi-line output, printed verbatim in the value column.
+
+    Not wrapped and not re-indented beyond the label: this is somebody else's
+    rendering — the real CLI's — and reflowing it would make the transcript a
+    paraphrase of the thing it is quoting.
+    """
+    for number, line in enumerate(text.splitlines()):
+        print(f"{label if number == 0 else '':<{LABEL_WIDTH}}{line}")
 
 
 def heading(number: int, title: str) -> None:
@@ -949,6 +964,93 @@ def a_report_round_trips_through_its_canonical_serialization() -> None:
     )
 
 
+#: Every CLI invocation this section makes, with the exit code it must return and
+#: the constant that names it. The codes are read from the CLI's own constants,
+#: never written as numbers: the difference between "the lexicon could not be
+#: loaded" and "the prompt did not resolve" is the contract a script branches on,
+#: and a literal here could drift away from it silently. The lexicon is named by
+#: its bare filename because the CLI echoes the path it was given, and an absolute
+#: one would make this transcript different on every machine.
+THE_CLI_INVOCATIONS = (
+    (("validate", LEXICON.name), EXIT_OK, "EXIT_OK"),
+    (
+        ("try", LEXICON.name, "--locale", "de-DE", "wo sind die filme"),
+        EXIT_OK,
+        "EXIT_OK",
+    ),
+    (
+        ("try", LEXICON.name, "--locale", "de-DE", "wo ist das wetter"),
+        EXIT_NO_MATCH,
+        "EXIT_NO_MATCH",
+    ),
+)
+
+
+def the_same_lexicon_through_the_real_cli() -> None:
+    """The same lexicon through `lexiqr validate` and `lexiqr try` [C14, C15]
+
+    A lexicon author writes no Python, and everything above this point was
+    Python. This is also the one honest place the CLI's own report format
+    appears: it comes from the real CLI or not at all.
+    """
+    emit(
+        "claim",
+        "The same file the sections above resolved against runs through both CLI "
+        "commands, and each command's exit code is a contract a script branches "
+        "on. A valid lexicon and a resolved prompt exit zero; a valid lexicon "
+        "whose prompt resolved nothing has its own code, distinct from every "
+        "way loading can fail.",
+    )
+    emit(
+        "invoked",
+        f"as `python -m lexiqr.cli …` from {LEXICON.parent.name}/, so nothing "
+        f"depends on PATH or on the console script. The codes below are read from "
+        f"the CLI's named constants.",
+    )
+
+    for argv, expected, name in THE_CLI_INVOCATIONS:
+        result = subprocess.run(
+            [sys.executable, "-m", "lexiqr.cli", *argv],
+            cwd=LEXICON.parent,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            # The CLI renders an arrow and German umlauts, so it is asked for the
+            # same UTF-8 the driver reconfigured its own stdout to. Without this a
+            # console whose default code page cannot hold them would fail the
+            # child rather than this run, which is a confusing place to meet it.
+            env={**os.environ, "PYTHONIOENCODING": "utf-8"},
+        )
+
+        emit("command", f"lexiqr {shlex.join(argv)}")
+        emit_lines("output", result.stdout.rstrip("\n"))
+        emit("exit", f"{result.returncode} ({name})")
+
+        assert result.returncode == expected, (
+            f"`lexiqr {shlex.join(argv)}` exited {result.returncode}; the contract "
+            f"says {expected} ({name})"
+        )
+        assert result.stdout.strip(), (
+            f"`lexiqr {shlex.join(argv)}` printed nothing to stdout"
+        )
+
+    emit(
+        "held",
+        "both commands ran against the same document, each printing what a lexicon "
+        "author sees and returning the code a script reads. The report above is the "
+        "CLI's own rendering, not this run's — which is why the two look different.",
+    )
+
+    assert EXIT_OK != EXIT_NO_MATCH, (
+        "the CLI no longer tells a resolved prompt from an unresolved one, so "
+        "nothing above is the contract this section claims to show"
+    )
+    assert len({code for _, code, _ in THE_CLI_INVOCATIONS}) > 1, (
+        "every invocation here expects the same exit code, so the section shows no "
+        "contract at all"
+    )
+
+
 # --- The driver --------------------------------------------------------------
 
 
@@ -980,6 +1082,7 @@ SECTIONS: tuple[Section, ...] = (
     a_sentence_is_ordered_by_position_and_an_overlap_resolved,
     bounded_input_is_refused_or_answered_but_never_hangs,
     a_report_round_trips_through_its_canonical_serialization,
+    the_same_lexicon_through_the_real_cli,
 )
 
 

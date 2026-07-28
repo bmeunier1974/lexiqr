@@ -51,6 +51,7 @@ from lexiqr import (
     deserialize_report,
     serialize_report,
 )
+from lexiqr.cli import EXIT_NO_MATCH, EXIT_OK
 
 EXAMPLES = REPO_ROOT / "examples"
 RUN = EXAMPLES / "demo.py"
@@ -682,11 +683,12 @@ def test_the_transcript_shows_a_report_round_tripping_through_its_serialization(
 #: sections could not notice a section going missing. Grows when the run grows a
 #: claim; shrinking it is a decision somebody has to make on purpose.
 THE_CAPABILITIES_THE_RUN_CLAIMS = frozenset(
-    {"C2", "C3", "C4", "C5", "C6", "C7", "C8", "C9", "C19"}
+    {"C2", "C3", "C4", "C5", "C6", "C7", "C8", "C9", "C14", "C15", "C19"}
 )
 
-#: A capability tag as the section titles carry it: `[C19]`.
-CAPABILITY_TAG = re.compile(r"\[(C\d+)\]")
+#: A capability tag as the section titles carry it — one, or several in one
+#: bracket: `[C19]`, `[C14, C15]`.
+CAPABILITY_TAG = re.compile(r"\[(C\d+(?:,\s*C\d+)*)\]")
 
 
 def test_every_capability_the_run_claims_appears_in_its_output() -> None:
@@ -698,7 +700,11 @@ def test_every_capability_the_run_claims_appears_in_its_output() -> None:
     here, independently, and every one of them has to be somewhere in the
     transcript.
     """
-    tagged = set(CAPABILITY_TAG.findall(GOLDEN.read_text(encoding="utf-8")))
+    tagged = {
+        tag
+        for group in CAPABILITY_TAG.findall(GOLDEN.read_text(encoding="utf-8"))
+        for tag in re.findall(r"C\d+", group)
+    }
 
     missing = THE_CAPABILITIES_THE_RUN_CLAIMS - tagged
     assert not missing, (
@@ -730,6 +736,75 @@ def test_every_capability_the_run_claims_is_a_capability_the_vision_declares() -
         f"the run claims {', '.join(sorted(undeclared))}, which VISION.md does not "
         f"declare"
     )
+
+
+def test_the_transcript_shows_the_real_cli_with_the_exit_codes_a_script_reads() -> None:
+    """Section 12's invocations, run here rather than read off the transcript.
+
+    Each command in the run's own table is invoked the same way the section
+    invokes it, so a change in the CLI's exit-code contract or in its rendered
+    report fails here rather than being absorbed by a regenerated golden. The
+    distinction that matters is the last one: "valid lexicon, nothing matched" is
+    a different code from every load failure, and a script branches on it.
+    """
+    printed = transcript_of("the_same_lexicon_through_the_real_cli")
+
+    assert EXIT_OK != EXIT_NO_MATCH, (
+        "the CLI no longer distinguishes a resolved prompt from an unresolved one, "
+        "which is the contract this section exists to show"
+    )
+    for argv, expected, name in demo.THE_CLI_INVOCATIONS:
+        result = subprocess.run(
+            [sys.executable, "-m", "lexiqr.cli", *argv],
+            cwd=LEXICON.parent,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+        )
+        assert result.returncode == expected, (
+            f"`lexiqr {' '.join(argv)}` exited {result.returncode}, not "
+            f"{expected} ({name})"
+        )
+        assert f"{expected} ({name})" in printed, (
+            f"the section does not name the exit code {expected} as {name}"
+        )
+        for line in result.stdout.splitlines():
+            assert collapsed(line) in printed or not line.strip(), (
+                f"the section does not carry what the CLI printed: {line!r}"
+            )
+
+
+def test_the_transcript_carries_the_clis_own_report_format() -> None:
+    """The one honest place the CLI's renderer appears — produced by the CLI.
+
+    The run has its own dense one-line rendering because the CLI's per-match block
+    is three to five lines and would have made twelve sections unreadable. That
+    trade is only defensible if the CLI's real format shows up somewhere, so it
+    shows up here, and these are the lines a lexicon author is looking for.
+    """
+    printed = transcript_of("the_same_lexicon_through_the_real_cli")
+
+    for line in ("entry: movie", "filter: genre=drama|thriller, productType=Movie"):
+        assert line in printed, f"the CLI's own {line.split(':')[0]} line is missing"
+    assert "no match" in printed, (
+        "the section does not show what an unresolved prompt prints"
+    )
+
+
+def test_the_run_reads_the_cli_exit_codes_from_their_named_constants() -> None:
+    """A hard-coded 4 is a 4 that can drift away from what the CLI returns.
+
+    The difference between "the lexicon could not be loaded" and "the prompt did
+    not resolve" is the whole contract a regression script branches on, so the run
+    reads the names rather than the numbers.
+    """
+    source = RUN.read_text(encoding="utf-8")
+
+    assert "from lexiqr.cli import" in source, (
+        "the run does not import the CLI's exit-code constants"
+    )
+    for name in ("EXIT_OK", "EXIT_NO_MATCH"):
+        assert name in source, f"the run does not name {name}"
 
 
 def test_the_run_records_how_its_golden_is_regenerated() -> None:
