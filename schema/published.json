@@ -13,7 +13,7 @@
     "its own format version, not by the release it happens to ship in."
   ],
   "lexicon.v1.schema.json": {
-    "publishedAt": "v1.1.0",
-    "sha256": "9d818d863ead0f140058287948c4947830ad770ca86869d79091f524aa8bef17"
+    "publishedAt": "v1.0.0",
+    "sha256": "ac00d269ce71c1da6e22c0c318cc5926f90e0374ae3dc9ad7a1b04d47ec59928"
   }
 }

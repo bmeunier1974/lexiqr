@@ -44,7 +44,7 @@ TARGET_SURFACE_FORMS = 1000
 #: The pointer the published fixtures carry, mirrored so the generated document
 #: looks like one an author would write.
 _SCHEMA_URL = (
-    "https://raw.githubusercontent.com/bmeunier1974/lexiqr/v1.1.0/"
+    "https://raw.githubusercontent.com/bmeunier1974/lexiqr/v1.0.0/"
     "schema/lexicon.v1.schema.json"
 )
 
