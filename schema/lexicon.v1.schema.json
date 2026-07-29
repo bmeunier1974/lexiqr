@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/bmeunier1974/lexiqr/v1.1.0/schema/lexicon.v1.schema.json",
+  "$id": "https://raw.githubusercontent.com/bmeunier1974/lexiqr/v1.0.0/schema/lexicon.v1.schema.json",
   "title": "lexiqr lexicon v1",
   "description": "A tenant's multilingual mapping from company jargon to canonical entities.",
   "type": "object",

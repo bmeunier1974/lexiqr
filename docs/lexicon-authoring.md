@@ -13,7 +13,7 @@ The lexicon format is described by a published
 [JSON Schema](https://json-schema.org/), at this URL:
 
 ```
-https://raw.githubusercontent.com/bmeunier1974/lexiqr/v1.1.0/schema/lexicon.v1.schema.json
+https://raw.githubusercontent.com/bmeunier1974/lexiqr/v1.0.0/schema/lexicon.v1.schema.json
 ```
 
 The version is in the path on purpose. That URL names a **tag**, and a tag
@@ -35,7 +35,7 @@ give you completion, hover documentation, and red squiggles as you type:
 
 ```json
 {
-  "$schema": "https://raw.githubusercontent.com/bmeunier1974/lexiqr/v1.1.0/schema/lexicon.v1.schema.json",
+  "$schema": "https://raw.githubusercontent.com/bmeunier1974/lexiqr/v1.0.0/schema/lexicon.v1.schema.json",
   "schemaVersion": "1",
   "defaultLocale": "de-DE",
   "entities": {
@@ -170,7 +170,7 @@ involved. Two convenient ones:
 ```bash
 # check-jsonschema (pipx install check-jsonschema)
 check-jsonschema --schemafile \
-  https://raw.githubusercontent.com/bmeunier1974/lexiqr/v1.1.0/schema/lexicon.v1.schema.json \
+  https://raw.githubusercontent.com/bmeunier1974/lexiqr/v1.0.0/schema/lexicon.v1.schema.json \
   my-tenant.lexicon.json
 
 # ajv-cli (npm install -g ajv-cli ajv-formats)

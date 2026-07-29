@@ -164,24 +164,22 @@ def test_the_output_the_guide_quotes_is_the_output_the_command_prints(
             assert line.strip() in guide
 
 
-# --- The changelog. A breaking change an integrating developer discovers by
-# --- upgrading is a breaking change that was not recorded.
+# --- The changelog. A report-shape fact an integrating developer discovers by
+# --- reading the wire is a fact that was not recorded.
 
 
-def test_the_changelog_records_the_feature_under_unreleased() -> None:
-    unreleased = read(CHANGELOG).split("## [Unreleased]")[1].split("## [1.0.0]")[0]
+def test_the_changelog_records_the_feature_in_the_release_that_ships_it() -> None:
+    entry = read(CHANGELOG).split("## [1.0.0]")[1].split("\n## ")[0]
 
-    assert "metadata" in unreleased.lower()
-    assert "canonicalId" in unreleased
+    assert "metadata" in entry.lower()
+    assert "canonicalId" in entry
 
 
 @pytest.mark.parametrize(
-    "breaking",
+    "shape_fact",
     ["entry_id", "serialize_report", "identifier"],
 )
-def test_the_changelog_calls_out_each_breaking_change(breaking: str) -> None:
-    unreleased = read(CHANGELOG).split("## [Unreleased]")[1].split("## [1.0.0]")[0]
-    changed = unreleased.lower()
+def test_the_changelog_records_each_report_shape_fact(shape_fact: str) -> None:
+    entry = read(CHANGELOG).split("## [1.0.0]")[1].split("\n## ")[0]
 
-    assert "breaking" in changed
-    assert breaking.lower() in changed
+    assert shape_fact.lower() in entry.lower()
