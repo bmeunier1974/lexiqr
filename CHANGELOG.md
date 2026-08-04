@@ -16,7 +16,7 @@ down under a new `## [x.y.z]` heading dated on the day it ships.
 
 ## [Unreleased]
 
-## [1.0.0] - 2026-07-28
+## [1.0.0] - 2026-08-04
 
 The initial public release of lexiqr: deterministic, tenant-scoped resolution of
 company jargon to canonical entities, on PyPI.
