@@ -57,13 +57,13 @@ packages = ["src/lexiqr"]
 [dependency-groups]
 dev = [
     "pytest>=8.0",
-    "ruff>=0.16.0",
+    "ruff>=0.16.1",
     "mypy>=1.11",
     "jsonschema>=4.26.0",
     "types-jsonschema>=4.26.0.20260518",
     "pyyaml>=6.0.3",
     "types-pyyaml>=6.0.12.20260724",
-    "hypothesis>=6.163.0",
+    "hypothesis>=6.164.0",
 ]
 
 [tool.pytest.ini_options]
